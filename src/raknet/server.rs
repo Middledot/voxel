@@ -9,8 +9,7 @@ use crate::raknet::datatypes;
 pub struct RakNetServer {
     socket: UdpSocket,
     server_guid: i64,
-    config: Config,
-    server_name: Option<String>
+    config: Config
 }
 
 impl RakNetServer {
@@ -18,16 +17,11 @@ impl RakNetServer {
         let mut rng = rand::thread_rng();
         let random_number: i64 = rng.gen_range(1..=i64::MAX);
 
-        let mut class = Self {
-            socket: std::net::UdpSocket::bind("127.0.0.1:19132").expect("Zamn"),
+        Self {
+            socket: std::net::UdpSocket::bind("127.0.0.1:".to_string() + config.get_property("server-port")).expect("Zamn"),
             server_guid: random_number,
             config: config,
-            server_name: None
-        };
-
-        class.server_name = Some(class.get_server_name());
-
-        return class
+        }
     }
 
     pub fn get_server_name(&self) -> String {
@@ -65,10 +59,7 @@ impl RakNetServer {
         buffer = datatypes::write_magic(&magic, buffer);
 
         // self.server_name.unwrap_or("".to_string());
-        let server_name = match &self.server_name {
-            Some(server_name) => server_name,
-            _ => ""
-        };
+        let server_name = self.get_server_name();
 
         let server_name: Vec<u8> = server_name.as_bytes().to_vec();
         let server_name_len = (server_name.len()) as i16;
@@ -82,16 +73,34 @@ impl RakNetServer {
     pub fn open_conn_req_1(&self, body: Vec<u8>, client: SocketAddr) {
         let (body, magic) = datatypes::read_magic(body);
         let protocol = body[0];  // magic value, unknown use (always 11)
-        let max_packet_size = (body[1..].len() + 46) as i16;
+        let mtu = (body[1..].len() + 46) as i16;
 
         let mut buffer: Vec<u8> = vec![];
         buffer.push(0x06);
         buffer = datatypes::write_magic(&magic, buffer);
         buffer = datatypes::write_i64_be_bytes(&self.server_guid, buffer);
         buffer.push(0x00);  // boolean (false)
-        buffer = datatypes::write_i16_be_bytes(&max_packet_size, buffer);
+        buffer = datatypes::write_i16_be_bytes(&mtu, buffer);
 
         self.socket.send_to(&buffer, client).expect("Sending packet failed");
+        println!("SENT = {:?}", &buffer);
+    }
+
+    pub fn open_conn_req_2(&self, body: Vec<u8>, client: SocketAddr) {
+        let (body, magic) = datatypes::read_magic(body);
+        let (body, server_address) = datatypes::read_address(body);
+        let (body, mtu) = datatypes::read_i16_be_bytes(body);
+        let (body, client_guid) = datatypes::read_i64_be_bytes(body);
+
+        let mut buffer: Vec<u8> = vec![];
+        buffer.push(0x08);
+        buffer = datatypes::write_magic(&magic, buffer);
+        buffer = datatypes::write_i64_be_bytes(&self.server_guid, buffer);
+        // TODO: write address
+        buffer = datatypes::write_i16_be_bytes(&mtu, buffer);
+        buffer.push(0);  // disable encryption // TODO: look into?
+
+        self.socket.send_to(&buffer, client). expect("Sending packet failed");
         println!("SENT = {:?}", &buffer);
     }
 
@@ -108,7 +117,8 @@ impl RakNetServer {
             match buf[0] {
                 0x01 | 0x02 => self.unconnected_ping(buf[1..].to_vec(), client),
                 0x05 => self.open_conn_req_1(buf[1..].to_vec(), client),
-                _ => return
+                0x07 => self.open_conn_req_2(buf[1..].to_vec(), client),
+                _ => panic!("There's nothing we can do | Nous pouvons rien faire")
             }
         }
     }

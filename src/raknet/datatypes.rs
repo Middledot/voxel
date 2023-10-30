@@ -5,7 +5,6 @@ use std::io::Read;
 pub fn read_i64_be_bytes(buffer: Vec<u8>) -> (Vec<u8>, i64) {
     let mut result = [0u8; 8];
     buffer.take(8).read(&mut result).expect("Damn");
-    println!("bruh {:?}", result);
     
     return (buffer[8..].to_vec(), i64::from_be_bytes(result));
 }

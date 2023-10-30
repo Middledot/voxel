@@ -53,7 +53,7 @@ impl RakNetServer {
     pub fn unconnected_ping(&self, body: Vec<u8>, client: SocketAddr) {
         // I don't like how this looks but it's Rust so it must be fine
         // TODO: I have a feeling this code is somehow inefficient (using vectors a lot and whatnot)
-        // probably look at it later
+        // probably look at again at some point
         let (body, client_timestamp) = datatypes::read_i64_be_bytes(body);
         let (body, magic) = datatypes::read_magic(body);
         let (_body, client_guid) = datatypes::read_i64_be_bytes(body);

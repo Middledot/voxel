@@ -1,24 +1,22 @@
 // barebones server.properties reader
 
-use regex::Regex;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 
 pub struct Config {
-    config: HashMap<String, String>
+    pub config: HashMap<String, String>
 }
 
 impl Config {
     pub fn parse() -> Self {
-        let re = Regex::new(r"[\r\n]+").unwrap();
         let mut text = String::new();
         let mut file = File::open("server.properties").expect("Couldn't find server.properties");
         file.read_to_string(&mut text).expect("server.properties malformed");
 
-        let config: HashMap<String, String> = re.find_iter(&text).filter_map(
+        let config: HashMap<String, String> = text.split("\n").filter_map(
             |x| {
-                let item = x.as_str();
+                let item = x;
                 if item.starts_with("#") || !item.contains("=") {
                     return None
                 }

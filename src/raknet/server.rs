@@ -31,7 +31,7 @@ impl RakNetServer {
     }
 
     pub fn get_server_name(&self) -> String {
-        let motd = self.config.get_property("max-players");
+        let motd = self.config.get_property("server-name");
 
         // so picky I don't get it smh
         return vec![
@@ -58,10 +58,6 @@ impl RakNetServer {
         let (body, magic) = datatypes::read_magic(body);
         let (_body, client_guid) = datatypes::read_i64_be_bytes(body);
 
-        println!("{}", &client_timestamp);
-        println!("{:?}", &magic);
-        println!("{}", &client_guid);
-
         let mut buffer: Vec<u8> = vec![];
         buffer.push(0x1c);
         buffer = datatypes::write_i64_be_bytes(&client_timestamp, buffer);
@@ -75,9 +71,25 @@ impl RakNetServer {
         };
 
         let server_name: Vec<u8> = server_name.as_bytes().to_vec();
-        let server_name_len = TryInto::<i16>::try_into(server_name.len()).expect("Server name length exceeds the signed 16-bit integer limit");
+        let server_name_len = (server_name.len()) as i16;
         buffer = datatypes::write_i16_be_bytes(&server_name_len, buffer);
         buffer.extend_from_slice(&server_name);
+
+        self.socket.send_to(&buffer, client).expect("Sending packet failed");
+        println!("SENT = {:?}", &buffer);
+    }
+
+    pub fn open_conn_req_1(&self, body: Vec<u8>, client: SocketAddr) {
+        let (body, magic) = datatypes::read_magic(body);
+        let protocol = body[0];  // magic value, unknown use (always 11)
+        let max_packet_size = (body[1..].len() + 46) as i16;
+
+        let mut buffer: Vec<u8> = vec![];
+        buffer.push(0x06);
+        buffer = datatypes::write_magic(&magic, buffer);
+        buffer = datatypes::write_i64_be_bytes(&self.server_guid, buffer);
+        buffer.push(0x00);  // boolean (false)
+        buffer = datatypes::write_i16_be_bytes(&max_packet_size, buffer);
 
         self.socket.send_to(&buffer, client).expect("Sending packet failed");
         println!("SENT = {:?}", &buffer);
@@ -89,13 +101,14 @@ impl RakNetServer {
         loop {
             let (packetsize, client) = match self.socket.recv_from(&mut buf) { //.expect("Zamn");
                 Ok((packetsize, client)) => (packetsize, client),
-                Err(e) => panic!("recv function failed: {e:?}"),
+                Err(_e) => continue  // panic!("recv function failed: {e:?}"),
             };
             println!("RECV = {:?}", &buf[..packetsize]);
 
             match buf[0] {
                 0x01 | 0x02 => self.unconnected_ping(buf[1..].to_vec(), client),
-                _ => panic!("idk")
+                0x05 => self.open_conn_req_1(buf[1..].to_vec(), client),
+                _ => return
             }
         }
     }

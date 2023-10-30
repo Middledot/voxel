@@ -70,7 +70,7 @@ impl RakNetServer {
         println!("SENT = {:?}", &buffer);
     }
 
-    pub fn open_conn_req_1(&self, body: Vec<u8>, client: SocketAddr) {
+    pub fn offline_connection_request_1(&self, body: Vec<u8>, client: SocketAddr) {
         let (body, magic) = datatypes::read_magic(body);
         let protocol = body[0];  // magic value, unknown use (always 11)
         let mtu = (body[1..].len() + 46) as i16;
@@ -86,7 +86,7 @@ impl RakNetServer {
         println!("SENT = {:?}", &buffer);
     }
 
-    pub fn open_conn_req_2(&self, body: Vec<u8>, client: SocketAddr) {
+    pub fn offline_connection_request_2(&self, body: Vec<u8>, client: SocketAddr) {
         let (body, magic) = datatypes::read_magic(body);
         let (body, server_address) = datatypes::read_address(body);
         let (body, mtu) = datatypes::read_i16_be_bytes(body);
@@ -116,8 +116,8 @@ impl RakNetServer {
 
             match buf[0] {
                 0x01 | 0x02 => self.unconnected_ping(buf[1..].to_vec(), client),
-                0x05 => self.open_conn_req_1(buf[1..].to_vec(), client),
-                0x07 => self.open_conn_req_2(buf[1..].to_vec(), client),
+                0x05 => self.offline_connection_request_1(buf[1..].to_vec(), client),
+                0x07 => self.offline_connection_request_2(buf[1..].to_vec(), client),
                 _ => panic!("There's nothing we can do | Nous pouvons rien faire")
             }
         }

@@ -4,7 +4,6 @@ use std::net::SocketAddr;
 // use std::io::{Read, Result};
 
 use crate::config::Config;
-use crate::raknet::datatypes;
 use crate::raknet::datatypes::MsgBuffer;
 
 pub struct RakNetServer {
@@ -93,7 +92,7 @@ impl RakNetServer {
         buffer.write_byte(0x08);
         buffer.write_magic(&magic);
         buffer.write_i64_be_bytes(&self.server_guid);
-        // TODO: write address
+        buffer.write_address(&client);
         buffer.write_i16_be_bytes(&mtu);
         buffer.write_byte(0);  // disable encryption // TODO: look into?
 
@@ -101,8 +100,12 @@ impl RakNetServer {
         println!("SENT = {:?}", buffer.into_bytes());
     }
 
+    pub fn frame_set(&self) {
+        // nothing yet
+    }
+
     pub fn mainloop(&self) {
-        let mut buf: [u8; 1024] = [0; 1024];  // 1kb
+        let mut buf = [0u8; 1024];  // 1kb
 
         loop {
             let (packetsize, client) = match self.socket.recv_from(&mut buf) { //.expect("Zamn");
@@ -116,6 +119,7 @@ impl RakNetServer {
                 0x01 | 0x02 => self.unconnected_ping(body, client),
                 0x05 => self.offline_connection_request_1(body, client),
                 0x07 => self.offline_connection_request_2(body, client),
+                0x80..=0x8d => self.frame_set(),
                 _ => panic!("There's nothing we can do | Nous pouvons rien faire")
             }
         }

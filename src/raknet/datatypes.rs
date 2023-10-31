@@ -32,15 +32,20 @@ impl MsgBuffer {
         return self.buffer.len();
     }
 
-    pub fn rest_len(&mut self) -> usize {
-        // possibly remove this??
-        return self.buffer[self.pos..].len();
+    pub fn len_rest(&mut self) -> usize {
+        return self.len()-self.pos;
     }
 
     pub fn read(&mut self, num: u64, buf: &mut [u8]) -> usize {
         let res = self.buffer[self.pos..].take(num).read(buf);
         self.pos += num as usize;
         return res.expect("Failed to read");
+    }
+
+    pub fn read_rest(&mut self) -> Vec<u8> {
+        let res = self.buffer[self.pos..].to_vec();
+        // self.pos += num as usize;
+        return res;
     }
 
     pub fn read_byte(&mut self) -> u8 {
@@ -68,6 +73,40 @@ impl MsgBuffer {
         self.write(&to_i64_be_bytes(value));
     }
 
+    pub fn read_i16_be_bytes(&mut self) -> i16 {
+        let mut result = [0u8; 2];
+        self.read(8, &mut result);
+    
+        return from_i16_be_bytes(result);
+    }
+
+    pub fn write_i16_be_bytes(&mut self, value: &i16) {
+        self.write(&to_i16_be_bytes(value));
+    }
+
+    pub fn read_u16_be_bytes(&mut self) -> u16 {
+        let mut result = [0u8; 2];
+        self.read(8, &mut result);
+    
+        return from_u16_be_bytes(result);
+    }
+
+    pub fn write_u16_be_bytes(&mut self, value: &u16) {
+        self.write(&to_u16_be_bytes(value));
+    }
+
+    pub fn read_u24_le_bytes(&mut self) -> u32 {
+        // we pretend it's a u24 but really we're using u32
+        let mut result = [0u8; 3];
+        self.read(3, &mut result);
+    
+        return from_u24_le_bytes_to_u32(result);
+    }
+
+    pub fn write_u24_le_bytes(&mut self, value: &u32) {
+        self.write(&to_u24_le_bytes(value));
+    }
+
     pub fn read_magic(&mut self) -> [u8; 16] {
         let mut magic = [0u8; 16];
         self.read(16, &mut magic);
@@ -77,17 +116,6 @@ impl MsgBuffer {
 
     pub fn write_magic(&mut self, magic: &[u8; 16]) {
         self.write(magic);
-    }
-
-    pub fn read_i16_be_bytes(&mut self) -> i16 {
-        let mut result = [0u8; 2];
-        self.read(8, &mut result);
-    
-        return from_i16_be_bytes(result);
-    }
-    
-    pub fn write_i16_be_bytes(&mut self, value: &i16) {
-        self.write(&to_i16_be_bytes(value));
     }
 
     pub fn read_address(&mut self) -> SocketAddr {
@@ -130,6 +158,33 @@ pub fn from_i16_be_bytes(bytes: [u8; 2]) -> i16 {
 
 pub fn to_i16_be_bytes(value: &i16) -> [u8; 2] {
     return value.to_be_bytes();
+}
+
+pub fn from_u16_be_bytes(bytes: [u8; 2]) -> u16 {
+    return u16::from_be_bytes(bytes);
+}
+
+pub fn to_u16_be_bytes(value: &u16) -> [u8; 2] {
+    return value.to_be_bytes();
+}
+
+pub fn from_u24_le_bytes_to_u32(bytes: [u8; 3]) -> u32 {
+    let mut newarr = [0u8; 4];
+    for i in 0..3 {
+        newarr[i + 1] = bytes[i];  // why
+    };
+
+    return u32::from_le_bytes(newarr);
+}
+
+pub fn to_u24_le_bytes(value: &u32) -> [u8; 3] {
+    let result = value.to_le_bytes();
+    let mut newarr = [0u8; 3];
+    for i in 0..3 {
+        newarr[i] = result[i+1];
+    }
+
+    return newarr;
 }
 
 // pub fn write_address(value: SocketAddr)

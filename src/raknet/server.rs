@@ -44,64 +44,89 @@ impl RakNetServer {
         ].join(";")
     }
 
-    pub fn unconnected_ping(&self, mut body: MsgBuffer, client: SocketAddr) {
-        let client_timestamp = body.read_i64_be_bytes();
-        let magic = body.read_magic();
-        let _client_guid = body.read_i16_be_bytes();
+    pub fn unconnected_ping(&self, mut bufin: MsgBuffer, client: SocketAddr) {
+        let client_timestamp = bufin.read_i64_be_bytes();
+        let magic = bufin.read_magic();
+        let _client_guid = bufin.read_i16_be_bytes();
 
-        let mut buffer = MsgBuffer::new();
-        buffer.write_byte(0x1c);
-        buffer.write_i64_be_bytes(&client_timestamp);
-        buffer.write_i64_be_bytes(&self.server_guid);
-        buffer.write_magic(&magic);
+        let mut bufout = MsgBuffer::new();
+        bufout.write_byte(0x1c);
+        bufout.write_i64_be_bytes(&client_timestamp);
+        bufout.write_i64_be_bytes(&self.server_guid);
+        bufout.write_magic(&magic);
 
         let server_name = self.get_server_name();
         let server_name: Vec<u8> = server_name.as_bytes().to_vec();
         let server_name_len = (server_name.len()) as i16;
 
-        buffer.write_i16_be_bytes(&server_name_len);
-        buffer.write(&server_name);
+        bufout.write_i16_be_bytes(&server_name_len);
+        bufout.write(&server_name);
 
-        self.socket.send_to(buffer.into_bytes(), client).expect("Sending packet failed");
-        println!("SENT = {:?}", buffer.into_bytes());
+        self.socket.send_to(bufout.into_bytes(), client).expect("Sending packet failed");
+        println!("SENT = {:?}", bufout.into_bytes());
     }
 
-    pub fn offline_connection_request_1(&self, mut body: MsgBuffer, client: SocketAddr) {
-        let magic = body.read_magic();
-        let _protocol = body.read_byte();  // mysterious magical mystical value, unknown use (always 11)
-        let mtu = (body.rest_len() + 46) as i16;
+    pub fn offline_connection_request_1(&self, mut bufin: MsgBuffer, client: SocketAddr) {
+        let magic = bufin.read_magic();
+        let _protocol = bufin.read_byte();  // mysterious magical mystical value, unknown use (always 11)
+        let mtu = (bufin.len_rest() + 46) as i16;
 
-        let mut buffer = MsgBuffer::new();
-        buffer.write_byte(0x06);
-        buffer.write_magic(&magic);
-        buffer.write_i64_be_bytes(&self.server_guid);
-        buffer.write_byte(0x00);  // boolean (false)
-        buffer.write_i16_be_bytes(&mtu);
+        let mut bufout = MsgBuffer::new();
+        bufout.write_byte(0x06);
+        bufout.write_magic(&magic);
+        bufout.write_i64_be_bytes(&self.server_guid);
+        bufout.write_byte(0x00);  // boolean (false)
+        bufout.write_i16_be_bytes(&mtu);
 
-        self.socket.send_to(buffer.into_bytes(), client).expect("Sending packet failed");
-        println!("SENT = {:?}", buffer.into_bytes());
+        self.socket.send_to(bufout.into_bytes(), client).expect("Sending packet failed");
+        println!("SENT = {:?}", bufout.into_bytes());
     }
 
-    pub fn offline_connection_request_2(&self, mut body: MsgBuffer, client: SocketAddr) {
-        let magic = body.read_magic();
-        let _server_address = body.read_address();
-        let mtu = body.read_i16_be_bytes();
-        let _client_guid = body.read_i64_be_bytes();
+    pub fn offline_connection_request_2(&self, mut bufin: MsgBuffer, client: SocketAddr) {
+        let magic = bufin.read_magic();
+        let _server_address = bufin.read_address();
+        let mtu = bufin.read_i16_be_bytes();
+        let _client_guid = bufin.read_i64_be_bytes();
 
-        let mut buffer = MsgBuffer::new();
-        buffer.write_byte(0x08);
-        buffer.write_magic(&magic);
-        buffer.write_i64_be_bytes(&self.server_guid);
-        buffer.write_address(&client);
-        buffer.write_i16_be_bytes(&mtu);
-        buffer.write_byte(0);  // disable encryption // TODO: look into?
+        let mut bufout = MsgBuffer::new();
+        bufout.write_byte(0x08);
+        bufout.write_magic(&magic);
+        bufout.write_i64_be_bytes(&self.server_guid);
+        bufout.write_address(&client);
+        bufout.write_i16_be_bytes(&mtu);
+        bufout.write_byte(0);  // disable encryption // TODO: look into?
 
-        self.socket.send_to(buffer.into_bytes(), client). expect("Sending packet failed");
-        println!("SENT = {:?}", buffer.into_bytes());
+        self.socket.send_to(bufout.into_bytes(), client). expect("Sending packet failed");
+        println!("SENT = {:?}", bufout.into_bytes());
     }
 
-    pub fn frame_set(&self) {
-        // nothing yet
+    pub fn frame_set(&self, mut bufin: MsgBuffer, client: SocketAddr) {
+        let sequence = bufin.read_u24_le_bytes();
+
+        let flags = bufin.read_byte();
+        let bitlength = bufin.read_u16_be_bytes();
+        // TODO: check if these parameters appear as 0s or don't appear
+        let rel_frameindex = bufin.read_u24_le_bytes();
+        let seq_frameindex = bufin.read_u24_le_bytes();
+
+        let ord_frameindex = bufin.read_u24_le_bytes();
+        let ord_chnl = bufin.read_byte();
+
+        // let compound_size = 
+        let compound_id = bufin.read_i16_be_bytes();
+        // let index = 
+
+        let body = bufin.read_rest();
+    }
+
+    pub fn run_event(&self, id: u8, bufin: MsgBuffer, client: SocketAddr) {
+        match id {
+            0x01 | 0x02 => self.unconnected_ping(bufin, client),
+            0x05 => self.offline_connection_request_1(bufin, client),
+            0x07 => self.offline_connection_request_2(bufin, client),
+            0x80..=0x8d => self.frame_set(bufin, client),
+            _ => panic!("There's nothing we can do | Nous pouvons rien faire")
+        }
     }
 
     pub fn mainloop(&self) {
@@ -113,15 +138,9 @@ impl RakNetServer {
                 Err(_e) => continue  // panic!("recv function failed: {e:?}"),
             };
             println!("RECV = {:?}", &buf[..packetsize]);
-            let body = MsgBuffer::from(buf[1..packetsize].to_vec());
+            let bufin = MsgBuffer::from(buf[1..packetsize].to_vec());
 
-            match buf[0] {
-                0x01 | 0x02 => self.unconnected_ping(body, client),
-                0x05 => self.offline_connection_request_1(body, client),
-                0x07 => self.offline_connection_request_2(body, client),
-                0x80..=0x8d => self.frame_set(),
-                _ => panic!("There's nothing we can do | Nous pouvons rien faire")
-            }
+            self.run_event(buf[0], bufin, client);
         }
     }
 }

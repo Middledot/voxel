@@ -112,11 +112,23 @@ impl RakNetServer {
         let ord_frameindex = bufin.read_u24_le_bytes();
         let ord_chnl = bufin.read_byte();
 
-        // let compound_size = 
+        let compound_size = bufin.read_i32_be_bytes();
         let compound_id = bufin.read_i16_be_bytes();
-        // let index = 
+        let index = bufin.read_i32_be_bytes();
 
         let body = bufin.read_rest();
+
+        println!("{:?}", &sequence);
+        println!("{:?}", &flags);
+        println!("{:?}", &bitlength);
+        println!("{:?}", &rel_frameindex);
+        println!("{:?}", &seq_frameindex);
+        println!("{:?}", &ord_frameindex);
+        println!("{:?}", &ord_chnl);
+        println!("{:?}", &compound_size);
+        println!("{:?}", &compound_id);
+        println!("{:?}", &index);
+        println!("{:?}", &body);
     }
 
     pub fn run_event(&self, id: u8, bufin: MsgBuffer, client: SocketAddr) {

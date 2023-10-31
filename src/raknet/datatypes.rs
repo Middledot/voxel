@@ -73,6 +73,29 @@ impl MsgBuffer {
         self.write(&to_i64_be_bytes(value));
     }
 
+    pub fn read_i32_be_bytes(&mut self) -> i32 {
+        let mut result = [0u8; 4];
+        self.read(4, &mut result);
+
+        return from_i32_be_bytes(result);
+    }
+
+    pub fn write_i32_be_bytes(&mut self, value: &i32) {
+        self.write(&to_i32_be_bytes(value));
+    }
+
+    pub fn read_u24_le_bytes(&mut self) -> u32 {
+        // we pretend it's a u24 but really we're using u32
+        let mut result = [0u8; 3];
+        self.read(3, &mut result);
+    
+        return from_u24_le_bytes_to_u32(result);
+    }
+
+    pub fn write_u24_le_bytes(&mut self, value: &u32) {
+        self.write(&to_u24_le_bytes(value));
+    }
+
     pub fn read_i16_be_bytes(&mut self) -> i16 {
         let mut result = [0u8; 2];
         self.read(8, &mut result);
@@ -93,18 +116,6 @@ impl MsgBuffer {
 
     pub fn write_u16_be_bytes(&mut self, value: &u16) {
         self.write(&to_u16_be_bytes(value));
-    }
-
-    pub fn read_u24_le_bytes(&mut self) -> u32 {
-        // we pretend it's a u24 but really we're using u32
-        let mut result = [0u8; 3];
-        self.read(3, &mut result);
-    
-        return from_u24_le_bytes_to_u32(result);
-    }
-
-    pub fn write_u24_le_bytes(&mut self, value: &u32) {
-        self.write(&to_u24_le_bytes(value));
     }
 
     pub fn read_magic(&mut self) -> [u8; 16] {
@@ -185,6 +196,14 @@ pub fn to_u24_le_bytes(value: &u32) -> [u8; 3] {
     }
 
     return newarr;
+}
+
+pub fn from_i32_be_bytes(bytes: [u8; 4]) -> i32 {
+    return i32::from_be_bytes(bytes);
+}
+
+pub fn to_i32_be_bytes(value: &i32) -> [u8; 4] {
+    return value.to_be_bytes();
 }
 
 // pub fn write_address(value: SocketAddr)

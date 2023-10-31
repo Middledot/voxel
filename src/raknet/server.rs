@@ -5,6 +5,7 @@ use std::net::SocketAddr;
 
 use crate::config::Config;
 use crate::raknet::datatypes;
+use crate::raknet::datatypes::MsgBuffer;
 
 pub struct RakNetServer {
     socket: UdpSocket,
@@ -44,64 +45,60 @@ impl RakNetServer {
         ].join(";")
     }
 
-    pub fn unconnected_ping(&self, body: Vec<u8>, client: SocketAddr) {
-        // I don't like how this looks but it's Rust so it must be fine
-        // TODO: I have a feeling this code is somehow inefficient (using vectors a lot and whatnot)
-        // probably look at again at some point
-        let (body, client_timestamp) = datatypes::read_i64_be_bytes(body);
-        let (body, magic) = datatypes::read_magic(body);
-        let (_body, client_guid) = datatypes::read_i64_be_bytes(body);
+    pub fn unconnected_ping(&self, mut body: MsgBuffer, client: SocketAddr) {
+        let client_timestamp = body.read_i64_be_bytes();
+        let magic = body.read_magic();
+        let _client_guid = body.read_i16_be_bytes();
 
-        let mut buffer: Vec<u8> = vec![];
-        buffer.push(0x1c);
-        buffer = datatypes::write_i64_be_bytes(&client_timestamp, buffer);
-        buffer = datatypes::write_i64_be_bytes(&self.server_guid, buffer);
-        buffer = datatypes::write_magic(&magic, buffer);
+        let mut buffer = MsgBuffer::new();
+        buffer.write_byte(0x1c);
+        buffer.write_i64_be_bytes(&client_timestamp);
+        buffer.write_i64_be_bytes(&self.server_guid);
+        buffer.write_magic(&magic);
 
-        // self.server_name.unwrap_or("".to_string());
         let server_name = self.get_server_name();
-
         let server_name: Vec<u8> = server_name.as_bytes().to_vec();
         let server_name_len = (server_name.len()) as i16;
-        buffer = datatypes::write_i16_be_bytes(&server_name_len, buffer);
-        buffer.extend_from_slice(&server_name);
 
-        self.socket.send_to(&buffer, client).expect("Sending packet failed");
-        println!("SENT = {:?}", &buffer);
+        buffer.write_i16_be_bytes(&server_name_len);
+        buffer.write(&server_name);
+
+        self.socket.send_to(buffer.into_bytes(), client).expect("Sending packet failed");
+        println!("SENT = {:?}", buffer.into_bytes());
     }
 
-    pub fn offline_connection_request_1(&self, body: Vec<u8>, client: SocketAddr) {
-        let (body, magic) = datatypes::read_magic(body);
-        let protocol = body[0];  // magic value, unknown use (always 11)
-        let mtu = (body[1..].len() + 46) as i16;
+    pub fn offline_connection_request_1(&self, mut body: MsgBuffer, client: SocketAddr) {
+        let magic = body.read_magic();
+        let _protocol = body.read_byte();  // mysterious magical mystical value, unknown use (always 11)
+        let mtu = (body.rest_len() + 46) as i16;
 
-        let mut buffer: Vec<u8> = vec![];
-        buffer.push(0x06);
-        buffer = datatypes::write_magic(&magic, buffer);
-        buffer = datatypes::write_i64_be_bytes(&self.server_guid, buffer);
-        buffer.push(0x00);  // boolean (false)
-        buffer = datatypes::write_i16_be_bytes(&mtu, buffer);
+        let mut buffer = MsgBuffer::new();
+        buffer.write_byte(0x06);
+        buffer.write_magic(&magic);
+        buffer.write_i64_be_bytes(&self.server_guid);
+        buffer.write_byte(0x00);  // boolean (false)
+        buffer.write_i16_be_bytes(&mtu);
 
-        self.socket.send_to(&buffer, client).expect("Sending packet failed");
-        println!("SENT = {:?}", &buffer);
+        self.socket.send_to(buffer.into_bytes(), client).expect("Sending packet failed");
+        println!("SENT = {:?}", buffer.into_bytes());
     }
 
-    pub fn offline_connection_request_2(&self, body: Vec<u8>, client: SocketAddr) {
-        let (body, magic) = datatypes::read_magic(body);
-        let (body, server_address) = datatypes::read_address(body);
-        let (body, mtu) = datatypes::read_i16_be_bytes(body);
-        let (body, client_guid) = datatypes::read_i64_be_bytes(body);
+    pub fn offline_connection_request_2(&self, mut body: MsgBuffer, client: SocketAddr) {
+        let magic = body.read_magic();
+        let _server_address = body.read_address();
+        let mtu = body.read_i16_be_bytes();
+        let _client_guid = body.read_i64_be_bytes();
 
-        let mut buffer: Vec<u8> = vec![];
-        buffer.push(0x08);
-        buffer = datatypes::write_magic(&magic, buffer);
-        buffer = datatypes::write_i64_be_bytes(&self.server_guid, buffer);
+        let mut buffer = MsgBuffer::new();
+        buffer.write_byte(0x08);
+        buffer.write_magic(&magic);
+        buffer.write_i64_be_bytes(&self.server_guid);
         // TODO: write address
-        buffer = datatypes::write_i16_be_bytes(&mtu, buffer);
-        buffer.push(0);  // disable encryption // TODO: look into?
+        buffer.write_i16_be_bytes(&mtu);
+        buffer.write_byte(0);  // disable encryption // TODO: look into?
 
-        self.socket.send_to(&buffer, client). expect("Sending packet failed");
-        println!("SENT = {:?}", &buffer);
+        self.socket.send_to(buffer.into_bytes(), client). expect("Sending packet failed");
+        println!("SENT = {:?}", buffer.into_bytes());
     }
 
     pub fn mainloop(&self) {
@@ -113,11 +110,12 @@ impl RakNetServer {
                 Err(_e) => continue  // panic!("recv function failed: {e:?}"),
             };
             println!("RECV = {:?}", &buf[..packetsize]);
+            let body = MsgBuffer::from(buf[1..packetsize].to_vec());
 
             match buf[0] {
-                0x01 | 0x02 => self.unconnected_ping(buf[1..].to_vec(), client),
-                0x05 => self.offline_connection_request_1(buf[1..].to_vec(), client),
-                0x07 => self.offline_connection_request_2(buf[1..].to_vec(), client),
+                0x01 | 0x02 => self.unconnected_ping(body, client),
+                0x05 => self.offline_connection_request_1(body, client),
+                0x07 => self.offline_connection_request_2(body, client),
                 _ => panic!("There's nothing we can do | Nous pouvons rien faire")
             }
         }

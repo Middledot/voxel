@@ -14,12 +14,9 @@ pub struct RakNetServer {
 
 impl RakNetServer {
     pub fn bind(config: Config) -> Self {
-        let mut rng = rand::thread_rng();
-        let random_number: i64 = rng.gen_range(1..=i64::MAX);
-
         Self {
-            socket: std::net::UdpSocket::bind("127.0.0.1:".to_string() + config.get_property("server-port")).expect("Zamn"),
-            server_guid: random_number,
+            socket: std::net::UdpSocket::bind("127.0.0.1:".to_string() + config.get_property("server-port")).expect("Failed to bind to port"),
+            server_guid: rand::thread_rng().gen_range(1..=i64::MAX),
             config: config,
         }
     }
@@ -44,7 +41,7 @@ impl RakNetServer {
         ].join(";")
     }
 
-    pub fn unconnected_ping(&self, mut bufin: MsgBuffer, client: SocketAddr) {
+    pub fn unconnected_ping(&self, packet_id: u8, mut bufin: MsgBuffer, client: SocketAddr) {
         let client_timestamp = bufin.read_i64_be_bytes();
         let magic = bufin.read_magic();
         let _client_guid = bufin.read_i16_be_bytes();
@@ -66,7 +63,7 @@ impl RakNetServer {
         println!("SENT = {:?}", bufout.into_bytes());
     }
 
-    pub fn offline_connection_request_1(&self, mut bufin: MsgBuffer, client: SocketAddr) {
+    pub fn offline_connection_request_1(&self, packet_id: u8, mut bufin: MsgBuffer, client: SocketAddr) {
         let magic = bufin.read_magic();
         let _protocol = bufin.read_byte();  // mysterious magical mystical value, unknown use (always 11)
         let mtu = (bufin.len_rest() + 46) as i16;
@@ -82,7 +79,7 @@ impl RakNetServer {
         println!("SENT = {:?}", bufout.into_bytes());
     }
 
-    pub fn offline_connection_request_2(&self, mut bufin: MsgBuffer, client: SocketAddr) {
+    pub fn offline_connection_request_2(&self, packet_id: u8, mut bufin: MsgBuffer, client: SocketAddr) {
         let magic = bufin.read_magic();
         let _server_address = bufin.read_address();
         let mtu = bufin.read_i16_be_bytes();
@@ -100,7 +97,7 @@ impl RakNetServer {
         println!("SENT = {:?}", bufout.into_bytes());
     }
 
-    pub fn frame_set(&self, mut bufin: MsgBuffer, client: SocketAddr) {
+    pub fn frame_set(&self, packet_id: u8, mut bufin: MsgBuffer, client: SocketAddr) {
         let sequence = bufin.read_u24_le_bytes();
 
         let flags = bufin.read_byte();
@@ -131,12 +128,12 @@ impl RakNetServer {
         println!("{:?}", &body);
     }
 
-    pub fn run_event(&self, id: u8, bufin: MsgBuffer, client: SocketAddr) {
-        match id {
-            0x01 | 0x02 => self.unconnected_ping(bufin, client),
-            0x05 => self.offline_connection_request_1(bufin, client),
-            0x07 => self.offline_connection_request_2(bufin, client),
-            0x80..=0x8d => self.frame_set(bufin, client),
+    pub fn run_event(&self, packet_id: u8, bufin: MsgBuffer, client: SocketAddr) {
+        match packet_id {
+            0x01 | 0x02 => self.unconnected_ping(packet_id, bufin, client),
+            0x05 => self.offline_connection_request_1(packet_id, bufin, client),
+            0x07 => self.offline_connection_request_2(packet_id, bufin, client),
+            0x80..=0x8d => self.frame_set(packet_id, bufin, client),
             _ => panic!("There's nothing we can do | Nous pouvons rien faire")
         }
     }

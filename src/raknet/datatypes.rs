@@ -3,6 +3,8 @@
 use std::io::Read;
 use std::net::{SocketAddr, Ipv4Addr, IpAddr};
 
+use super::enums::ReliabilityType;
+
 pub struct MsgBuffer {
     buffer: Vec<u8>,
     pos: usize,
@@ -24,6 +26,10 @@ impl MsgBuffer {
         }
     }
 
+    pub fn at_end(&mut self) -> bool {
+        return self.pos == self.buffer.len()-1;
+    }
+
     pub fn into_bytes(&mut self) -> &Vec<u8> {
         return &self.buffer;
     }
@@ -37,9 +43,21 @@ impl MsgBuffer {
     }
 
     pub fn read(&mut self, num: u64, buf: &mut [u8]) -> usize {
+        println!("ff{:?}", &self.pos);
+        println!("ff{:?}", &num);
+        println!("ff{:?}", num as usize+self.pos);
         let res = self.buffer[self.pos..].take(num).read(buf);
         self.pos += num as usize;
         return res.expect("Failed to read");
+    }
+
+    pub fn read_vec(&mut self, num: usize) -> Vec<u8> {
+        println!("ee{:?}", &num);
+        println!("ee{:?}", &self.pos);
+        println!("ee{:?}", self.buffer.len()-1);
+        let res = self.buffer[self.pos..self.pos+num].to_vec();
+        self.pos += num;
+        return res;
     }
 
     pub fn read_rest(&mut self) -> Vec<u8> {
@@ -152,7 +170,69 @@ impl MsgBuffer {
         self.write(&ip);
         self.write_i16_be_bytes(&(address.port() as i16));
     }
+}
 
+
+pub struct Frame {
+
+}
+
+impl Frame {
+    pub fn parse(buf: &mut MsgBuffer) -> Self {
+        // so far, pretty much completely taken from PieMC
+        let flags = buf.read_byte();
+        let bitlength = buf.read_u16_be_bytes();
+
+        let reliability = ReliabilityType::from_flags(flags);
+        let rreliability = ReliabilityType::from_flags(flags);
+        println!("{:?}", rreliability as u8);
+        let fragmented = (flags & 1) != 0;
+
+        let mut rel_frameindex: u32 = 234;
+        let mut seq_frameindex: u32 = 234;
+        let mut ord_frameindex: u32 = 234;
+        let mut ord_chnl: u8 = 234;
+
+        let mut compound_size: i32 = 234;
+        let mut compound_id: i16 = 234;
+        let mut index: i32 = 234;
+
+        if reliability.is_reliable() {
+            rel_frameindex = buf.read_u24_le_bytes();
+        }
+
+        if reliability.is_sequenced() {
+            seq_frameindex = buf.read_u24_le_bytes();
+        }
+
+        if reliability.is_ordered() {
+            ord_frameindex = buf.read_u24_le_bytes();
+            ord_chnl = buf.read_byte();
+        }
+
+        if fragmented {
+            compound_size = buf.read_i32_be_bytes();
+            compound_id = buf.read_i16_be_bytes();
+            index = buf.read_i32_be_bytes();
+        }
+
+        let bytesize = (bitlength + 7) / 8;
+        
+        println!("{:?}", &flags);
+        println!("{:?}", &bitlength);
+        println!("{:?}", &bytesize);
+        println!("{:?}", &rel_frameindex);
+        println!("{:?}", &seq_frameindex);
+        println!("{:?}", &ord_frameindex);
+        println!("{:?}", &ord_chnl);
+        println!("{:?}", &compound_size);
+        println!("{:?}", &compound_id);
+        println!("{:?}", &index);
+        let body = buf.read_vec(bytesize as usize);
+        println!("body: {:?}", &body);
+
+        Self {}
+    }
 }
 
 pub fn from_i64_be_bytes(bytes: [u8; 8]) -> i64 {

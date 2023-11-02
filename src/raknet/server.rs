@@ -4,7 +4,7 @@ use std::net::SocketAddr;
 // use std::io::{Read, Result};
 
 use crate::config::Config;
-use crate::raknet::datatypes::MsgBuffer;
+use crate::raknet::datatypes::{MsgBuffer, Frame};
 
 pub struct RakNetServer {
     socket: UdpSocket,
@@ -100,32 +100,17 @@ impl RakNetServer {
     pub fn frame_set(&self, packet_id: u8, mut bufin: MsgBuffer, client: SocketAddr) {
         let sequence = bufin.read_u24_le_bytes();
 
-        let flags = bufin.read_byte();
-        let bitlength = bufin.read_u16_be_bytes();
-        // TODO: check if these parameters appear as 0s or don't appear
-        let rel_frameindex = bufin.read_u24_le_bytes();
-        let seq_frameindex = bufin.read_u24_le_bytes();
+        let mut frame_set: Vec<Frame> = vec![];
+        println!("seqs: {:?}", &sequence);
 
-        let ord_frameindex = bufin.read_u24_le_bytes();
-        let ord_chnl = bufin.read_byte();
+        loop {
+            if bufin.at_end() {
+                break;
+            }
 
-        let compound_size = bufin.read_i32_be_bytes();
-        let compound_id = bufin.read_i16_be_bytes();
-        let index = bufin.read_i32_be_bytes();
+            frame_set.push(Frame::parse(&mut bufin))
+        }
 
-        let body = bufin.read_rest();
-
-        println!("{:?}", &sequence);
-        println!("{:?}", &flags);
-        println!("{:?}", &bitlength);
-        println!("{:?}", &rel_frameindex);
-        println!("{:?}", &seq_frameindex);
-        println!("{:?}", &ord_frameindex);
-        println!("{:?}", &ord_chnl);
-        println!("{:?}", &compound_size);
-        println!("{:?}", &compound_id);
-        println!("{:?}", &index);
-        println!("{:?}", &body);
     }
 
     pub fn run_event(&self, packet_id: u8, bufin: MsgBuffer, client: SocketAddr) {

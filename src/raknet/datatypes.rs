@@ -43,18 +43,12 @@ impl MsgBuffer {
     }
 
     pub fn read(&mut self, num: u64, buf: &mut [u8]) -> usize {
-        println!("ff{:?}", &self.pos);
-        println!("ff{:?}", &num);
-        println!("ff{:?}", num as usize+self.pos);
         let res = self.buffer[self.pos..].take(num).read(buf);
         self.pos += num as usize;
         return res.expect("Failed to read");
     }
 
     pub fn read_vec(&mut self, num: usize) -> Vec<u8> {
-        println!("ee{:?}", &num);
-        println!("ee{:?}", &self.pos);
-        println!("ee{:?}", self.buffer.len()-1);
         let res = self.buffer[self.pos..self.pos+num].to_vec();
         self.pos += num;
         return res;
@@ -184,8 +178,6 @@ impl Frame {
         let bitlength = buf.read_u16_be_bytes();
 
         let reliability = ReliabilityType::from_flags(flags);
-        let rreliability = ReliabilityType::from_flags(flags);
-        println!("{:?}", rreliability as u8);
         let fragmented = (flags & 1) != 0;
 
         let mut rel_frameindex: u32 = 234;
@@ -217,7 +209,10 @@ impl Frame {
         }
 
         let bytesize = (bitlength + 7) / 8;
-        
+        println!("rel? {:?}", reliability.is_reliable());
+        println!("seq? {:?}", reliability.is_sequenced());
+        println!("ord? {:?}", reliability.is_ordered());
+
         println!("{:?}", &flags);
         println!("{:?}", &bitlength);
         println!("{:?}", &bytesize);

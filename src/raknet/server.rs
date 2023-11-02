@@ -91,13 +91,14 @@ impl RakNetServer {
         bufout.write_i64_be_bytes(&self.server_guid);
         bufout.write_address(&client);
         bufout.write_i16_be_bytes(&mtu);
-        bufout.write_byte(0);  // disable encryption // TODO: look into?
+        bufout.write_byte(0);  // disable encryption // TODO: look into? what is this?
 
         self.socket.send_to(bufout.into_bytes(), client). expect("Sending packet failed");
         println!("SENT = {:?}", bufout.into_bytes());
     }
 
     pub fn frame_set(&self, packet_id: u8, mut bufin: MsgBuffer, client: SocketAddr) {
+        // test bytes: [132, 0, 0, 0, 64, 0, 144, 0, 0, 0, 9, 131, 237, 153, 211, 18, 169, 106, 213, 0, 0, 0, 2, 56, 60, 233, 205, 0]
         let sequence = bufin.read_u24_le_bytes();
 
         let mut frame_set: Vec<Frame> = vec![];

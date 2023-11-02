@@ -3,7 +3,7 @@
 use std::io::Read;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
-use super::enums::ReliabilityType;
+use super::reliability::Reliability;
 
 pub struct MsgBuffer {
     buffer: Vec<u8>,
@@ -172,7 +172,12 @@ impl MsgBuffer {
     }
 }
 
-pub struct Frame {}
+pub struct Frame {
+    flags: u8,
+    bitlength: u16,  // remove?
+    bytelength: u16,
+    fragmented: bool,
+}
 
 impl Frame {
     pub fn parse(buf: &mut MsgBuffer) -> Self {
@@ -180,30 +185,14 @@ impl Frame {
         let flags = buf.read_byte();
         let bitlength = buf.read_u16_be_bytes();
 
-        let reliability = ReliabilityType::from_flags(flags);
-        let fragmented = (flags & 1) != 0;
+        let reliability = Reliability::new(flags);
+        reliability.extract(buf);
 
-        let mut rel_frameindex: u32 = 234;
-        let mut seq_frameindex: u32 = 234;
-        let mut ord_frameindex: u32 = 234;
-        let mut ord_chnl: u8 = 234;
+        let fragmented = (flags & 1) != 0;
 
         let mut compound_size: i32 = 234;
         let mut compound_id: i16 = 234;
         let mut index: i32 = 234;
-
-        if reliability.is_reliable() {
-            rel_frameindex = buf.read_u24_le_bytes();
-        }
-
-        if reliability.is_sequenced() {
-            seq_frameindex = buf.read_u24_le_bytes();
-        }
-
-        if reliability.is_ordered() {
-            ord_frameindex = buf.read_u24_le_bytes();
-            ord_chnl = buf.read_byte();
-        }
 
         if fragmented {
             compound_size = buf.read_i32_be_bytes();

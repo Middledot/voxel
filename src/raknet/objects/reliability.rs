@@ -1,4 +1,4 @@
-use super::datatypes::MsgBuffer;
+use super::MsgBuffer;
 
 pub enum ReliabilityType {
     Unreliable = 0,
@@ -34,10 +34,10 @@ impl ReliabilityType {
 
 pub struct Reliability {
     _type: ReliabilityType,
-    rel_frameindex: Option<u32>,
-    seq_frameindex: Option<u32>,
-    ord_frameindex: Option<u32>,
-    ord_channel: Option<u8>,
+    pub rel_frameindex: Option<u32>,
+    pub seq_frameindex: Option<u32>,
+    pub ord_frameindex: Option<u32>,
+    pub ord_channel: Option<u8>,
 }
 
 impl Reliability {
@@ -66,11 +66,40 @@ impl Reliability {
         }
     }
 
-    pub fn get_type(&mut self) -> ReliabilityType {
-        self._type
+    // actually we could just use .unwrap() and hope for the best
+
+    // pub fn get_rel_frameindex(&mut self) -> u32 {
+    //     match self.rel_frameindex {
+    //         Some(rel_frameindex) => rel_frameindex,
+    //         None => panic!("Not sure what to do here")
+    //     }
+    // }
+
+    // pub fn get_seq_frameindex(&mut self) -> u32 {
+    //     match self.seq_frameindex {
+    //         Some(seq_frameindex) => seq_frameindex,
+    //         None => panic!("Not sure what to do here")
+    //     }
+    // }
+
+    // pub fn get_ord_frameindex(&mut self) -> u32 {
+    //     match self.ord_frameindex {
+    //         Some(ord_frameindex) => ord_frameindex,
+    //         None => panic!("Not sure what to do here")
+    //     }
+    // }
+
+    // pub fn get_ord_channnel(&mut self) -> u8 {
+    //     match self.ord_channel {
+    //         Some(ord_channel) => ord_channel,
+    //         None => panic!("Not sure what to do here")
+    //     }
+    // }
+
+    pub fn get_type(&mut self) -> &ReliabilityType {
+        &self._type
     }
 
-    // these are better than what I came up earlier so
     pub fn is_reliable(&mut self) -> bool {
         if let ReliabilityType::Reliable
         | ReliabilityType::ReliableSequenced

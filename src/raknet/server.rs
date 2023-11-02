@@ -1,21 +1,23 @@
 use rand::Rng;
-use std::net::UdpSocket;
 use std::net::SocketAddr;
-// use std::io::{Read, Result};
+use std::net::UdpSocket;
 
 use crate::config::Config;
-use crate::raknet::datatypes::{MsgBuffer, Frame};
+use super::objects::{Frame, MsgBuffer};
 
 pub struct RakNetServer {
     socket: UdpSocket,
     server_guid: i64,
-    config: Config
+    config: Config,
 }
 
 impl RakNetServer {
     pub fn bind(config: Config) -> Self {
         Self {
-            socket: std::net::UdpSocket::bind("127.0.0.1:".to_string() + config.get_property("server-port")).expect("Failed to bind to port"),
+            socket: std::net::UdpSocket::bind(
+                "127.0.0.1:".to_string() + config.get_property("server-port"),
+            )
+            .expect("Failed to bind to port"),
             server_guid: rand::thread_rng().gen_range(1..=i64::MAX),
             config: config,
         }
@@ -37,8 +39,9 @@ impl RakNetServer {
             "Creative",
             "1",
             self.config.get_property("server-port").as_str(),
-            self.config.get_property("server-portv6").as_str()
-        ].join(";")
+            self.config.get_property("server-portv6").as_str(),
+        ]
+        .join(";");
     }
 
     pub fn unconnected_ping(&self, packet_id: u8, mut bufin: MsgBuffer, client: SocketAddr) {
@@ -59,27 +62,41 @@ impl RakNetServer {
         bufout.write_i16_be_bytes(&server_name_len);
         bufout.write(&server_name);
 
-        self.socket.send_to(bufout.into_bytes(), client).expect("Sending packet failed");
+        self.socket
+            .send_to(bufout.into_bytes(), client)
+            .expect("Sending packet failed");
         println!("SENT = {:?}", bufout.into_bytes());
     }
 
-    pub fn offline_connection_request_1(&self, packet_id: u8, mut bufin: MsgBuffer, client: SocketAddr) {
+    pub fn offline_connection_request_1(
+        &self,
+        packet_id: u8,
+        mut bufin: MsgBuffer,
+        client: SocketAddr,
+    ) {
         let magic = bufin.read_magic();
-        let _protocol = bufin.read_byte();  // mysterious magical mystical value, unknown use (always 11)
+        let _protocol = bufin.read_byte(); // mysterious magical mystical value, unknown use (always 11)
         let mtu = (bufin.len_rest() + 46) as i16;
 
         let mut bufout = MsgBuffer::new();
         bufout.write_byte(0x06);
         bufout.write_magic(&magic);
         bufout.write_i64_be_bytes(&self.server_guid);
-        bufout.write_byte(0x00);  // boolean (false)
+        bufout.write_byte(0x00); // boolean (false)
         bufout.write_i16_be_bytes(&mtu);
 
-        self.socket.send_to(bufout.into_bytes(), client).expect("Sending packet failed");
+        self.socket
+            .send_to(bufout.into_bytes(), client)
+            .expect("Sending packet failed");
         println!("SENT = {:?}", bufout.into_bytes());
     }
 
-    pub fn offline_connection_request_2(&self, packet_id: u8, mut bufin: MsgBuffer, client: SocketAddr) {
+    pub fn offline_connection_request_2(
+        &self,
+        packet_id: u8,
+        mut bufin: MsgBuffer,
+        client: SocketAddr,
+    ) {
         let magic = bufin.read_magic();
         let _server_address = bufin.read_address();
         let mtu = bufin.read_i16_be_bytes();
@@ -91,9 +108,11 @@ impl RakNetServer {
         bufout.write_i64_be_bytes(&self.server_guid);
         bufout.write_address(&client);
         bufout.write_i16_be_bytes(&mtu);
-        bufout.write_byte(0);  // disable encryption // TODO: look into? what is this?
+        bufout.write_byte(0); // disable encryption // TODO: look into? what is this?
 
-        self.socket.send_to(bufout.into_bytes(), client). expect("Sending packet failed");
+        self.socket
+            .send_to(bufout.into_bytes(), client)
+            .expect("Sending packet failed");
         println!("SENT = {:?}", bufout.into_bytes());
     }
 
@@ -111,7 +130,6 @@ impl RakNetServer {
 
             frame_set.push(Frame::parse(&mut bufin))
         }
-
     }
 
     pub fn run_event(&self, packet_id: u8, bufin: MsgBuffer, client: SocketAddr) {
@@ -120,17 +138,18 @@ impl RakNetServer {
             0x05 => self.offline_connection_request_1(packet_id, bufin, client),
             0x07 => self.offline_connection_request_2(packet_id, bufin, client),
             0x80..=0x8d => self.frame_set(packet_id, bufin, client),
-            _ => panic!("There's nothing we can do | Nous pouvons rien faire")
+            _ => panic!("There's nothing we can do | Nous pouvons rien faire"),
         }
     }
 
     pub fn mainloop(&self) {
-        let mut buf = [0u8; 1024];  // 1kb
+        let mut buf = [0u8; 1024]; // 1kb
 
         loop {
-            let (packetsize, client) = match self.socket.recv_from(&mut buf) { //.expect("Zamn");
+            let (packetsize, client) = match self.socket.recv_from(&mut buf) {
+                //.expect("Zamn");
                 Ok((packetsize, client)) => (packetsize, client),
-                Err(_e) => continue  // panic!("recv function failed: {e:?}"),
+                Err(_e) => continue, // panic!("recv function failed: {e:?}"),
             };
             println!("RECV = {:?}", &buf[..packetsize]);
             let bufin = MsgBuffer::from(buf[1..packetsize].to_vec());

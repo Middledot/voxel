@@ -1,9 +1,8 @@
-// Functions to read and right RakNet datatypes to/from bytes
 
 use std::io::Read;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
-use super::reliability::Reliability;
+use super::datatypes::*;
 
 pub struct MsgBuffer {
     buffer: Vec<u8>,
@@ -11,7 +10,6 @@ pub struct MsgBuffer {
 }
 
 impl MsgBuffer {
-    // maybe reconsider naming of these 2
     pub fn new() -> Self {
         Self {
             buffer: vec![],
@@ -171,112 +169,3 @@ impl MsgBuffer {
         self.write_i16_be_bytes(&(address.port() as i16));
     }
 }
-
-pub struct Frame {
-    flags: u8,
-    bitlength: u16,  // remove?
-    bytelength: u16,
-    fragmented: bool,
-}
-
-impl Frame {
-    pub fn parse(buf: &mut MsgBuffer) -> Self {
-        // so far, pretty much completely taken from PieMC
-        let flags = buf.read_byte();
-        let bitlength = buf.read_u16_be_bytes();
-
-        let reliability = Reliability::new(flags);
-        reliability.extract(buf);
-
-        let fragmented = (flags & 1) != 0;
-
-        let mut compound_size: i32 = 234;
-        let mut compound_id: i16 = 234;
-        let mut index: i32 = 234;
-
-        if fragmented {
-            compound_size = buf.read_i32_be_bytes();
-            compound_id = buf.read_i16_be_bytes();
-            index = buf.read_i32_be_bytes();
-        }
-
-        let bytesize = (bitlength + 7) / 8;
-        println!("rel? {:?}", reliability.is_reliable());
-        println!("seq? {:?}", reliability.is_sequenced());
-        println!("ord? {:?}", reliability.is_ordered());
-
-        println!("{:?}", &flags);
-        println!("{:?}", &bitlength);
-        println!("{:?}", &bytesize);
-        println!("{:?}", &rel_frameindex);
-        println!("{:?}", &seq_frameindex);
-        println!("{:?}", &ord_frameindex);
-        println!("{:?}", &ord_chnl);
-        println!("{:?}", &compound_size);
-        println!("{:?}", &compound_id);
-        println!("{:?}", &index);
-        let body = buf.read_vec(bytesize as usize);
-        println!("body: {:?}", &body);
-
-        Self {}
-    }
-}
-
-pub fn from_i64_be_bytes(bytes: [u8; 8]) -> i64 {
-    i64::from_be_bytes(bytes)
-}
-
-pub fn to_i64_be_bytes(value: &i64) -> [u8; 8] {
-    value.to_be_bytes()
-}
-
-pub fn from_i16_be_bytes(bytes: [u8; 2]) -> i16 {
-    i16::from_be_bytes(bytes)
-}
-
-pub fn to_i16_be_bytes(value: &i16) -> [u8; 2] {
-    value.to_be_bytes()
-}
-
-pub fn from_u16_be_bytes(bytes: [u8; 2]) -> u16 {
-    u16::from_be_bytes(bytes)
-}
-
-pub fn to_u16_be_bytes(value: &u16) -> [u8; 2] {
-    value.to_be_bytes()
-}
-
-pub fn from_u24_le_bytes_to_u32(bytes: [u8; 3]) -> u32 {
-    let mut newarr = [0u8; 4];
-    for i in 0..3 {  // why
-        newarr[i + 1] = bytes[i];
-    }
-
-    u32::from_le_bytes(newarr)
-}
-
-pub fn to_u24_le_bytes(value: &u32) -> [u8; 3] {
-    let result = value.to_le_bytes();
-    let mut newarr = [0u8; 3];
-    for i in 0..3 {
-        newarr[i] = result[i + 1];
-    }
-
-    newarr
-}
-
-pub fn from_i32_be_bytes(bytes: [u8; 4]) -> i32 {
-    i32::from_be_bytes(bytes)
-}
-
-pub fn to_i32_be_bytes(value: &i32) -> [u8; 4] {
-    value.to_be_bytes()
-}
-
-// pub fn write_address(value: SocketAddr)
-
-// read_string
-
-// pub fn write_string(value: &String, mut buffer: Vec<u8>) -> Vec<u8> {
-
-// }

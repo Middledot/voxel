@@ -1,7 +1,7 @@
 // Functions to read and right RakNet datatypes to/from bytes
 
 use std::io::Read;
-use std::net::{SocketAddr, Ipv4Addr, IpAddr};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use super::enums::ReliabilityType;
 
@@ -11,7 +11,7 @@ pub struct MsgBuffer {
 }
 
 impl MsgBuffer {
-    // maybe reconsider naming lol
+    // maybe reconsider naming of these 2
     pub fn new() -> Self {
         Self {
             buffer: vec![],
@@ -27,43 +27,46 @@ impl MsgBuffer {
     }
 
     pub fn at_end(&mut self) -> bool {
-        return self.pos == self.buffer.len()-1;
+        self.pos == self.buffer.len() - 1
     }
 
     pub fn into_bytes(&mut self) -> &Vec<u8> {
-        return &self.buffer;
+        &self.buffer
     }
 
     pub fn len(&mut self) -> usize {
-        return self.buffer.len();
+        self.buffer.len()
     }
 
     pub fn len_rest(&mut self) -> usize {
-        return self.len()-self.pos;
+        self.len() - self.pos
     }
 
     pub fn read(&mut self, num: u64, buf: &mut [u8]) -> usize {
         let res = self.buffer[self.pos..].take(num).read(buf);
         self.pos += num as usize;
-        return res.expect("Failed to read");
+
+        res.expect("Failed to read")
     }
 
     pub fn read_vec(&mut self, num: usize) -> Vec<u8> {
-        let res = self.buffer[self.pos..self.pos+num].to_vec();
+        let res = self.buffer[self.pos..self.pos + num].to_vec();
         self.pos += num;
-        return res;
+
+        res
     }
 
     pub fn read_rest(&mut self) -> Vec<u8> {
         let res = self.buffer[self.pos..].to_vec();
-        // self.pos += num as usize;
-        return res;
+
+        res
     }
 
     pub fn read_byte(&mut self) -> u8 {
         let result = self.buffer[self.pos];
         self.pos += 1;
-        return result;
+
+        result
     }
 
     pub fn write(&mut self, data: &[u8]) {
@@ -78,7 +81,7 @@ impl MsgBuffer {
         let mut result = [0u8; 8];
         self.read(8, &mut result);
 
-        return from_i64_be_bytes(result);
+        from_i64_be_bytes(result)
     }
 
     pub fn write_i64_be_bytes(&mut self, value: &i64) {
@@ -89,7 +92,7 @@ impl MsgBuffer {
         let mut result = [0u8; 4];
         self.read(4, &mut result);
 
-        return from_i32_be_bytes(result);
+        from_i32_be_bytes(result)
     }
 
     pub fn write_i32_be_bytes(&mut self, value: &i32) {
@@ -100,8 +103,8 @@ impl MsgBuffer {
         // we pretend it's a u24 but really we're using u32
         let mut result = [0u8; 3];
         self.read(3, &mut result);
-    
-        return from_u24_le_bytes_to_u32(result);
+
+        from_u24_le_bytes_to_u32(result)
     }
 
     pub fn write_u24_le_bytes(&mut self, value: &u32) {
@@ -111,8 +114,8 @@ impl MsgBuffer {
     pub fn read_i16_be_bytes(&mut self) -> i16 {
         let mut result = [0u8; 2];
         self.read(8, &mut result);
-    
-        return from_i16_be_bytes(result);
+
+        from_i16_be_bytes(result)
     }
 
     pub fn write_i16_be_bytes(&mut self, value: &i16) {
@@ -122,8 +125,8 @@ impl MsgBuffer {
     pub fn read_u16_be_bytes(&mut self) -> u16 {
         let mut result = [0u8; 2];
         self.read(2, &mut result);
-    
-        return from_u16_be_bytes(result);
+
+        from_u16_be_bytes(result)
     }
 
     pub fn write_u16_be_bytes(&mut self, value: &u16) {
@@ -134,7 +137,7 @@ impl MsgBuffer {
         let mut magic = [0u8; 16];
         self.read(16, &mut magic);
 
-        return magic;
+        magic
     }
 
     pub fn write_magic(&mut self, magic: &[u8; 16]) {
@@ -142,15 +145,18 @@ impl MsgBuffer {
     }
 
     pub fn read_address(&mut self) -> SocketAddr {
-        let _iptype = self.read_byte();  // TODO: support ipv6 https://wiki.vg/Raknet_Protocol#Data_types
+        let _iptype = self.read_byte(); // TODO: support ipv6 https://wiki.vg/Raknet_Protocol#Data_types
         let address: SocketAddr;
-    
-        // if iptype == 0x04 {  // ipv4 vs ipv6
-        let mut ip = [0u8; 6];  // 127 0 0 1
-        self.read(6, &mut ip);
-        address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(ip[0], ip[1], ip[2], ip[3])), from_i16_be_bytes([ip[4], ip[5]]) as u16);  // are you joking me right now (ports)
 
-        return address;
+        // if iptype == 0x04 {  // ipv4 vs ipv6
+        let mut ip = [0u8; 6]; // 127 0 0 1
+        self.read(6, &mut ip);
+        address = SocketAddr::new(
+            IpAddr::V4(Ipv4Addr::new(ip[0], ip[1], ip[2], ip[3])),
+            from_i16_be_bytes([ip[4], ip[5]]) as u16,
+        ); // are you joking me right now (ports)
+
+        address
     }
 
     pub fn write_address(&mut self, address: &SocketAddr) {
@@ -158,7 +164,7 @@ impl MsgBuffer {
         self.write_byte(0x04);
         let ip = match address.ip() {
             IpAddr::V4(addr) => addr.octets(),
-            _ => panic!("uhm excuse me")
+            _ => panic!("uhm excuse me"),
         };
 
         self.write(&ip);
@@ -166,10 +172,7 @@ impl MsgBuffer {
     }
 }
 
-
-pub struct Frame {
-
-}
+pub struct Frame {}
 
 impl Frame {
     pub fn parse(buf: &mut MsgBuffer) -> Self {
@@ -231,54 +234,54 @@ impl Frame {
 }
 
 pub fn from_i64_be_bytes(bytes: [u8; 8]) -> i64 {
-    return i64::from_be_bytes(bytes);
+    i64::from_be_bytes(bytes)
 }
 
 pub fn to_i64_be_bytes(value: &i64) -> [u8; 8] {
-    return value.to_be_bytes();
+    value.to_be_bytes()
 }
 
 pub fn from_i16_be_bytes(bytes: [u8; 2]) -> i16 {
-    return i16::from_be_bytes(bytes);
+    i16::from_be_bytes(bytes)
 }
 
 pub fn to_i16_be_bytes(value: &i16) -> [u8; 2] {
-    return value.to_be_bytes();
+    value.to_be_bytes()
 }
 
 pub fn from_u16_be_bytes(bytes: [u8; 2]) -> u16 {
-    return u16::from_be_bytes(bytes);
+    u16::from_be_bytes(bytes)
 }
 
 pub fn to_u16_be_bytes(value: &u16) -> [u8; 2] {
-    return value.to_be_bytes();
+    value.to_be_bytes()
 }
 
 pub fn from_u24_le_bytes_to_u32(bytes: [u8; 3]) -> u32 {
     let mut newarr = [0u8; 4];
-    for i in 0..3 {
-        newarr[i + 1] = bytes[i];  // why
-    };
+    for i in 0..3 {  // why
+        newarr[i + 1] = bytes[i];
+    }
 
-    return u32::from_le_bytes(newarr);
+    u32::from_le_bytes(newarr)
 }
 
 pub fn to_u24_le_bytes(value: &u32) -> [u8; 3] {
     let result = value.to_le_bytes();
     let mut newarr = [0u8; 3];
     for i in 0..3 {
-        newarr[i] = result[i+1];
+        newarr[i] = result[i + 1];
     }
 
-    return newarr;
+    newarr
 }
 
 pub fn from_i32_be_bytes(bytes: [u8; 4]) -> i32 {
-    return i32::from_be_bytes(bytes);
+    i32::from_be_bytes(bytes)
 }
 
 pub fn to_i32_be_bytes(value: &i32) -> [u8; 4] {
-    return value.to_be_bytes();
+    value.to_be_bytes()
 }
 
 // pub fn write_address(value: SocketAddr)

@@ -31,7 +31,7 @@ pub enum ReliabilityType {
     ReliableSequenced,
     UnreliableACK,
     ReliableACK,
-    ReliableOrderedACK
+    ReliableOrderedACK,
 }
 
 impl ReliabilityType {
@@ -50,13 +50,18 @@ impl ReliabilityType {
             5 => ReliabilityType::UnreliableACK,
             6 => ReliabilityType::ReliableACK,
             7 => ReliabilityType::ReliableOrderedACK,
-            _ => panic!("Uhm, excuse me")
+            _ => panic!("Uhm, excuse me"),
         }
     }
 
     // these are better than what I came up earlier so
     pub fn is_reliable(&self) -> bool {
-        if let ReliabilityType::Reliable | ReliabilityType::ReliableSequenced | ReliabilityType::ReliableOrdered | ReliabilityType::ReliableACK | ReliabilityType::ReliableOrderedACK = self {
+        if let ReliabilityType::Reliable
+        | ReliabilityType::ReliableSequenced
+        | ReliabilityType::ReliableOrdered
+        | ReliabilityType::ReliableACK
+        | ReliabilityType::ReliableOrderedACK = self
+        {
             return true;
         }
         return false;

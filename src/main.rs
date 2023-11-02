@@ -1,5 +1,5 @@
-mod raknet;
 mod config;
+mod raknet;
 
 #[tokio::main]
 async fn main() {
@@ -17,24 +17,15 @@ async fn main() {
     // ).await;
 
     // server.mainloop().await;
-    // -------------------------------------------------------------------------
-    // let socket = std::net::UdpSocket::bind("127.0.0.1:19132").expect("Zamn");
-    // let mut buf: [u8; 1024] = [0; 1024];
 
-    // loop {
-    //     let (packetsize, client) = match socket.recv_from(&mut buf) { //.expect("Zamn");
-    //         Ok((packetsize, client)) => (packetsize, client),
-    //         Err(e) => panic!("recv function failed: {e:?}"),
-    //     };
-    //     println!("{:?}", &buf[..packetsize]);
-
-    //     match buf[0] {
-    //         // 0x01 | 0x02 => 
-    //         _ => panic!("idk")
-    //     }
-    // }
     let config = config::Config::parse();
 
-    let raknet_server = raknet::server::RakNetServer::bind(config);  // later, make config reference for raknet, and VoxelServer owner
+    let raknet_server = raknet::server::RakNetServer::bind(config); // later, make config reference for raknet, and VoxelServer owner
     raknet_server.mainloop();
+
+    // // packet_id: 132
+    // // sequence: 0, 0, 0
+    // let test_bytes = [64, 0, 144, 0, 0, 0, 9, 131, 237, 153, 211, 18, 169, 106, 213, 0, 0, 0, 2, 56, 60, 233, 205, 0];
+    // let mut buf = raknet::datatypes::MsgBuffer::from(test_bytes.to_vec());
+    // let frame = raknet::datatypes::Frame::parse(&mut buf);
 }

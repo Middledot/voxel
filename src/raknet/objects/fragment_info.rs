@@ -2,9 +2,9 @@ use super::msgbuffer::MsgBuffer;
 
 pub struct FragmentInfo {
     pub is_fragmented: bool,
-    pub compound_size: Option<i32>,  // TODO: rename to just size?
+    pub compound_size: Option<i32>, // TODO: rename to just size?
     pub compound_id: Option<i16>,
-    pub index: Option<i32>
+    pub index: Option<i32>,
 }
 
 impl FragmentInfo {

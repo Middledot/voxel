@@ -1,11 +1,11 @@
+use super::FragmentInfo;
 use super::MsgBuffer;
 use super::Reliability;
-use super::FragmentInfo;
 
 pub struct Frame {
     flags: u8,
-    bitlength: u16,  // remove?
-    bytelength: u16,
+    bitlength: u16, // remove?
+    bodysize: u16,
     reliability: Reliability,
     fragment_info: FragmentInfo,
 }
@@ -22,14 +22,14 @@ impl Frame {
         let mut fragment_info = FragmentInfo::new(flags);
         fragment_info.extract(buf);
 
-        let bytelength = (bitlength + 7) / 8;
+        let bodysize = (bitlength + 7) / 8;
         println!("rel? {:?}", reliability.is_reliable());
         println!("seq? {:?}", reliability.is_sequenced());
         println!("ord? {:?}", reliability.is_ordered());
 
         println!("{:?}", &flags);
         println!("{:?}", &bitlength);
-        println!("{:?}", &bytelength);
+        println!("{:?}", &bodysize);
         println!("{:?}", &reliability.rel_frameindex.unwrap_or(234));
         println!("{:?}", &reliability.seq_frameindex.unwrap_or(234));
         println!("{:?}", &reliability.ord_frameindex.unwrap_or(234));
@@ -37,13 +37,13 @@ impl Frame {
         println!("{:?}", &fragment_info.compound_size.unwrap_or(234));
         println!("{:?}", &fragment_info.compound_id.unwrap_or(234));
         println!("{:?}", &fragment_info.index.unwrap_or(234));
-        let body = buf.read_vec(bytelength as usize);
+        let body = buf.read_vec(bodysize as usize);
         println!("body: {:?}", &body);
 
         Self {
             flags,
             bitlength,
-            bytelength,
+            bodysize,
             reliability,
             fragment_info,
         }

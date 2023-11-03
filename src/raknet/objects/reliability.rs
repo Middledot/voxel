@@ -113,7 +113,9 @@ impl Reliability {
     }
 
     pub fn is_sequenced(&mut self) -> bool {
-        if let ReliabilityType::UnreliableSequenced | ReliabilityType::ReliableSequenced = self.get_type() {
+        if let ReliabilityType::UnreliableSequenced | ReliabilityType::ReliableSequenced =
+            self.get_type()
+        {
             return true;
         }
         return false;
@@ -124,7 +126,9 @@ impl Reliability {
         if self.is_sequenced() {
             return true;
         }
-        if let ReliabilityType::ReliableOrdered | ReliabilityType::ReliableOrderedACK = self.get_type() {
+        if let ReliabilityType::ReliableOrdered | ReliabilityType::ReliableOrderedACK =
+            self.get_type()
+        {
             return true;
         }
         return false;

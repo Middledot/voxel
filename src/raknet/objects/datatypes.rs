@@ -1,11 +1,10 @@
 /// datatypes.rs
 /// ============
-/// 
+///
 /// Functions for convert RakNet datatypes into rust and vice versa
 /// Primarily used by MsgBuffer
-/// 
+///
 /// TODO: cleanup and trimming (do we need all of these?)
-
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
 pub fn from_i64_be_bytes(bytes: [u8; 8]) -> i64 {
@@ -26,7 +25,8 @@ pub fn to_i32_be_bytes(value: &i32) -> [u8; 4] {
 
 pub fn from_u24_le_bytes_to_u32(bytes: [u8; 3]) -> u32 {
     let mut newarr = [0u8; 4];
-    for i in 0..3 {  // why
+    for i in 0..3 {
+        // why
         newarr[i + 1] = bytes[i];
     }
 
@@ -67,7 +67,8 @@ pub fn from_address_bytes(version: u8, bytes: &Vec<u8>) -> SocketAddr {
             IpAddr::V4(Ipv4Addr::new(bytes[0], bytes[1], bytes[2], bytes[3])),
             from_u16_be_bytes([bytes[4], bytes[5]]),
         );
-    } else {  // ver == 0x06
+    } else {
+        // ver == 0x06
         address = SocketAddr::new(
             IpAddr::V6(Ipv6Addr::new(
                 // TODO: rewrite this
@@ -78,7 +79,7 @@ pub fn from_address_bytes(version: u8, bytes: &Vec<u8>) -> SocketAddr {
                 from_u16_be_bytes([bytes[20], bytes[21]]),
                 from_u16_be_bytes([bytes[22], bytes[23]]),
                 from_u16_be_bytes([bytes[24], bytes[25]]),
-                from_u16_be_bytes([bytes[26], bytes[27]])
+                from_u16_be_bytes([bytes[26], bytes[27]]),
             )),
             from_u16_be_bytes([bytes[1], bytes[2]]),
         );
@@ -98,7 +99,7 @@ pub fn to_address_bytes(addr: &SocketAddr) -> Vec<u8> {
         address.push(0x06);
         address.extend_from_slice(&to_u16_be_bytes(&0x17));
         address.extend_from_slice(&to_u16_be_bytes(&addr.port()));
-        
+
         let octets = ip.octets();
         address.extend_from_slice(&[0, 0, octets[2], octets[3]]);
         for segment in ip.segments() {

@@ -1,4 +1,3 @@
-
 use std::io::Read;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
@@ -146,11 +145,12 @@ impl MsgBuffer {
         let ipver = self.read_byte();
         let address: SocketAddr;
         if ipver == 0x04 {
-            let mut bytes = [0u8; 6];  // 7-1
+            let mut bytes = [0u8; 6]; // 7-1
             self.read(6, &mut bytes);
             address = from_address_bytes(ipver, &bytes.to_vec());
-        } else {  // if ipver == 0x06
-            let mut bytes = [0u8; 28];  // 29-1
+        } else {
+            // if ipver == 0x06
+            let mut bytes = [0u8; 28]; // 29-1
             self.read(28, &mut bytes);
             address = from_address_bytes(ipver, &bytes.to_vec());
         }

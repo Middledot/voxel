@@ -2,8 +2,8 @@ use rand::Rng;
 use std::net::SocketAddr;
 use std::net::UdpSocket;
 
-use crate::config::Config;
 use super::objects::{Frame, MsgBuffer};
+use crate::config::Config;
 
 pub struct RakNetServer {
     socket: UdpSocket,

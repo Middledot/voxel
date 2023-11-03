@@ -143,29 +143,22 @@ impl MsgBuffer {
     }
 
     pub fn read_address(&mut self) -> SocketAddr {
-        let _iptype = self.read_byte(); // TODO: support ipv6 https://wiki.vg/Raknet_Protocol#Data_types
+        let ipver = self.read_byte();
         let address: SocketAddr;
-
-        // if iptype == 0x04 {  // ipv4 vs ipv6
-        let mut ip = [0u8; 6]; // 127 0 0 1
-        self.read(6, &mut ip);
-        address = SocketAddr::new(
-            IpAddr::V4(Ipv4Addr::new(ip[0], ip[1], ip[2], ip[3])),
-            from_i16_be_bytes([ip[4], ip[5]]) as u16,
-        ); // are you joking me right now (ports)
+        if ipver == 0x04 {
+            let mut bytes = [0u8; 6];  // 7-1
+            self.read(6, &mut bytes);
+            address = from_address_bytes(ipver, &bytes.to_vec());
+        } else {  // if ipver == 0x06
+            let mut bytes = [0u8; 28];  // 29-1
+            self.read(28, &mut bytes);
+            address = from_address_bytes(ipver, &bytes.to_vec());
+        }
 
         address
     }
 
     pub fn write_address(&mut self, address: &SocketAddr) {
-        // address.is_ipv4
-        self.write_byte(0x04);
-        let ip = match address.ip() {
-            IpAddr::V4(addr) => addr.octets(),
-            _ => panic!("uhm excuse me"),
-        };
-
-        self.write(&ip);
-        self.write_i16_be_bytes(&(address.port() as i16));
+        self.write(&to_address_bytes(&address));
     }
 }

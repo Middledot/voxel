@@ -1,3 +1,9 @@
+/// raknet/objects/reliability.rs
+/// =============================
+/// 
+/// Class to hold reliability type and data.
+/// Refer to frame.rs
+
 use super::MsgBuffer;
 
 pub enum ReliabilityType {

@@ -1,3 +1,10 @@
+/// raknet/server.rs
+/// ================
+/// 
+/// The server, one who handles RakNet packets.
+/// 
+/// Reference: https://wiki.vg/Raknet_Protocol
+
 use rand::Rng;
 use std::net::SocketAddr;
 use std::net::UdpSocket;

@@ -1,10 +1,12 @@
-/// datatypes.rs
+/// raknet/objects/datatypes.rs
 /// ============
 ///
 /// Functions for convert RakNet datatypes into rust and vice versa
 /// Primarily used by MsgBuffer
+/// Reference: https://wiki.vg/Raknet_Protocol#Data_types
 ///
 /// TODO: cleanup and trimming (do we need all of these?)
+
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
 pub fn from_i64_be_bytes(bytes: [u8; 8]) -> i64 {

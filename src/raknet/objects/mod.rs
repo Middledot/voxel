@@ -1,4 +1,4 @@
-//! Various serialization/deserialisation objects RakNet uses
+/// Various serialization/deserialisation objects RakNet uses
 
 pub mod datatypes;
 pub mod fragment_info;

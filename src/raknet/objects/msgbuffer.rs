@@ -1,5 +1,5 @@
-/// mraknet/objects/msgbuffer.rs
-/// ============
+/// raknet/objects/msgbuffer.rs
+/// ===========================
 /// 
 /// A wrapper class to make it easier to read and
 /// write bytes.

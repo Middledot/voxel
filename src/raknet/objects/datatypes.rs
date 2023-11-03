@@ -1,5 +1,5 @@
 /// raknet/objects/datatypes.rs
-/// ============
+/// ===========================
 ///
 /// Functions for convert RakNet datatypes into rust and vice versa
 /// Primarily used by MsgBuffer

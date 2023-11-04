@@ -1,6 +1,12 @@
 mod config;
 mod raknet;
 
+use log::LevelFilter;
+use log4rs::append::console::ConsoleAppender;
+use log4rs::config::{Appender, Root};
+use log4rs::encode::pattern::PatternEncoder;
+use log4rs::Config;
+
 #[tokio::main]
 async fn main() {
     // let mut listener = RaknetListener::bind(
@@ -17,15 +23,15 @@ async fn main() {
     // ).await;
 
     // server.mainloop().await;
-
     let config = config::Config::parse();
+
+    let stdout = ConsoleAppender::builder().encoder(Box::new(PatternEncoder::new("{h({l})} {d(%d-%m-%Y %H:%M:%S)} [{f}:{L:<3}] {m}\n"))).build();
+    let logconfig = Config::builder()
+        .appender(Appender::builder().build("stdout", Box::new(stdout)))
+        .build(Root::builder().appender("stdout").build(LevelFilter::Trace))
+        .unwrap();
+    let _handle = log4rs::init_config(logconfig).unwrap();
 
     let raknet_server = raknet::server::RakNetServer::bind(config); // later, make config reference for raknet, and VoxelServer owner
     raknet_server.mainloop();
-
-    // // packet_id: 132
-    // // sequence: 0, 0, 0
-    // let test_bytes = [64, 0, 144, 0, 0, 0, 9, 131, 237, 153, 211, 18, 169, 106, 213, 0, 0, 0, 2, 56, 60, 233, 205, 0];
-    // let mut buf = raknet::datatypes::MsgBuffer::from(test_bytes.to_vec());
-    // let frame = raknet::datatypes::Frame::parse(&mut buf);
 }

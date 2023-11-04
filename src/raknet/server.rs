@@ -9,6 +9,8 @@ use rand::Rng;
 use std::net::SocketAddr;
 use std::net::UdpSocket;
 
+use log::trace;
+
 use super::objects::{Frame, MsgBuffer};
 use crate::config::Config;
 
@@ -72,7 +74,7 @@ impl RakNetServer {
         self.socket
             .send_to(bufout.into_bytes(), client)
             .expect("Sending packet failed");
-        println!("SENT = {:?}", bufout.into_bytes());
+        trace!("SENT = {:?}", bufout.into_bytes());
     }
 
     pub fn offline_connection_request_1(
@@ -95,7 +97,7 @@ impl RakNetServer {
         self.socket
             .send_to(bufout.into_bytes(), client)
             .expect("Sending packet failed");
-        println!("SENT = {:?}", bufout.into_bytes());
+        trace!("SENT = {:?}", bufout.into_bytes());
     }
 
     pub fn offline_connection_request_2(
@@ -120,7 +122,7 @@ impl RakNetServer {
         self.socket
             .send_to(bufout.into_bytes(), client)
             .expect("Sending packet failed");
-        println!("SENT = {:?}", bufout.into_bytes());
+        trace!("SENT = {:?}", bufout.into_bytes());
     }
 
     pub fn frame_set(&self, packet_id: u8, mut bufin: MsgBuffer, client: SocketAddr) {
@@ -150,6 +152,7 @@ impl RakNetServer {
     }
 
     pub fn mainloop(&self) {
+
         let mut buf = [0u8; 1024]; // 1kb
 
         loop {
@@ -158,7 +161,7 @@ impl RakNetServer {
                 Ok((packetsize, client)) => (packetsize, client),
                 Err(_e) => continue, // panic!("recv function failed: {e:?}"),
             };
-            println!("RECV = {:?}", &buf[..packetsize]);
+            trace!("RECV = {} {:?}", buf[0], &buf[..packetsize]);
             let bufin = MsgBuffer::from(buf[1..packetsize].to_vec());
 
             self.run_event(buf[0], bufin, client);

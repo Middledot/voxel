@@ -147,6 +147,14 @@ impl MsgBuffer {
         self.write(magic);
     }
 
+    pub fn write_string(&mut self, str: &String) {
+        let str: Vec<u8> = str.as_bytes().to_vec();
+        let str_len = (str.len()) as i16;
+
+        self.write_i16_be_bytes(&str_len);
+        self.write(&str);
+    }
+
     pub fn read_address(&mut self) -> SocketAddr {
         let ipver = self.read_byte();
         let address: SocketAddr;

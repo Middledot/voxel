@@ -1,11 +1,10 @@
 /// raknet/objects/frame.rs
 /// =======================
-/// 
+///
 /// Class that contains information of a frame, which is sent
 /// in multiples with frame_set (packet ids 0x80 to 0x8d).
-/// 
+///
 /// Reference: https://wiki.vg/Raknet_Protocol#Frame_Set_Packet
-
 use super::FragmentInfo;
 use super::MsgBuffer;
 use super::Reliability;

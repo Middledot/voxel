@@ -1,18 +1,17 @@
 /// raknet/server.rs
 /// ================
-/// 
+///
 /// The server, one who handles RakNet packets.
-/// 
+///
 /// Reference: https://wiki.vg/Raknet_Protocol
-
 use rand::Rng;
 use std::net::SocketAddr;
 use std::net::UdpSocket;
 
 use log::trace;
 
-use super::packets::*;
 use super::objects::{Frame, MsgBuffer};
+use super::packets::*;
 use crate::config::Config;
 
 pub struct RakNetServer {
@@ -55,7 +54,8 @@ impl RakNetServer {
     }
 
     pub fn send_packet<T>(&self, packet: &T, client: SocketAddr)
-        where T: Serialize
+    where
+        T: Serialize,
     {
         let mut serialized = packet.serialize();
         let body = serialized.into_bytes();
@@ -146,7 +146,6 @@ impl RakNetServer {
     }
 
     pub fn mainloop(&self) {
-
         let mut buf = [0u8; 1024]; // 1kb
 
         loop {

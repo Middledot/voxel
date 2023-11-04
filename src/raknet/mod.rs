@@ -1,4 +1,4 @@
 mod enums;
 pub mod objects;
-pub mod server;
 mod packets;
+pub mod server;

@@ -25,7 +25,11 @@ async fn main() {
     // server.mainloop().await;
     let config = config::Config::parse();
 
-    let stdout = ConsoleAppender::builder().encoder(Box::new(PatternEncoder::new("{h({l})} {d(%d-%m-%Y %H:%M:%S)} [{f}:{L:<3}] {m}\n"))).build();
+    let stdout = ConsoleAppender::builder()
+        .encoder(Box::new(PatternEncoder::new(
+            "{h({l})} {d(%d-%m-%Y %H:%M:%S)} [{f}:{L:<3}] {m}\n",
+        )))
+        .build();
     let logconfig = Config::builder()
         .appender(Appender::builder().build("stdout", Box::new(stdout)))
         .build(Root::builder().appender("stdout").build(LevelFilter::Trace))

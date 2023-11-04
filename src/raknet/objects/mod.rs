@@ -1,5 +1,4 @@
 /// Various serialization/deserialisation objects RakNet uses
-
 pub mod datatypes;
 pub mod fragment_info;
 pub mod frame;

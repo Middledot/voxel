@@ -5,12 +5,13 @@
 ///
 /// Reference: https://wiki.vg/Raknet_Protocol
 use rand::Rng;
-use std::net::SocketAddr;
+use std::time::{SystemTime, UNIX_EPOCH};
+use std::net::{SocketAddr, IpAddr, Ipv4Addr};
 use std::net::UdpSocket;
 
 use log::trace;
 
-use super::objects::{Frame, MsgBuffer};
+use super::objects::{Frame, MsgBuffer, datatypes::to_address_bytes};
 use super::packets::*;
 use crate::config::Config;
 
@@ -71,6 +72,9 @@ impl RakNetServer {
 
     pub fn unconnected_ping(&self, packet_id: u8, mut bufin: MsgBuffer, client: SocketAddr) {
         let offline_ping = OfflinePing::deserialise(&mut bufin);
+
+        println!("{:?}", offline_ping.client_guid);
+        println!("{:?}", self.server_guid);
 
         let offline_pong = OfflinePong {
             timestamp: offline_ping.timestamp,
@@ -133,16 +137,51 @@ impl RakNetServer {
 
             frame_set.push(Frame::parse(&mut bufin))
         }
+
+        let new_packet_id = frame_set[0].body[0];
+        let new_bufin = MsgBuffer::from(frame_set[0].body[1..].to_vec());
+
+        let output = self.get_event_func(new_packet_id)(&self, new_packet_id, new_bufin, client);
+    }
+
+    pub fn conn_req(&self, packet_id: u8, mut bufin: MsgBuffer, client: SocketAddr) -> Vec<u8> {
+        let apparently_some_unknown_guid = bufin.read_i64_be_bytes();
+        let timestamp = bufin.read_i64_be_bytes();
+
+        println!("{:?}", apparently_some_unknown_guid);
+
+        let mut bufout = MsgBuffer::new();
+        bufout.write_address(&client);
+        bufout.write_i16_be_bytes(&0);  // like, ok
+        let mystery_address = to_address_bytes(
+            &SocketAddr::new(IpAddr::V4(Ipv4Addr::new(255, 255, 255, 255)), 19132)
+        );
+        for _ in 0..10 {
+            bufout.write(&mystery_address);
+        }
+        bufout.write_i64_be_bytes(&timestamp);
+        bufout.write_i64_be_bytes(&(SystemTime::now().duration_since(UNIX_EPOCH).expect("Oops").as_millis() as i64));
+
+        *bufout.into_bytes()
+        // self.socket.send_to(bufout.into_bytes(), client).expect("Zamn");
+        // trace!("SENT = {:?}", bufout.into_bytes());
+    }
+
+    pub fn get_event_func(&self, packet_id: u8) -> fn(&Self, u8, MsgBuffer, SocketAddr) {
+        let eventfunc = match packet_id {
+            0x01 | 0x02 => RakNetServer::unconnected_ping,
+            0x05 => RakNetServer::offline_connection_request_1,
+            0x07 => RakNetServer::offline_connection_request_2,
+            0x09 => RakNetServer::conn_req,
+            0x80..=0x8d => RakNetServer::frame_set,
+            _ => panic!("There's nothing we can do | Nous pouvons rien faire"),
+        };
+
+        eventfunc
     }
 
     pub fn run_event(&self, packet_id: u8, bufin: MsgBuffer, client: SocketAddr) {
-        match packet_id {
-            0x01 | 0x02 => self.unconnected_ping(packet_id, bufin, client),
-            0x05 => self.offline_connection_request_1(packet_id, bufin, client),
-            0x07 => self.offline_connection_request_2(packet_id, bufin, client),
-            0x80..=0x8d => self.frame_set(packet_id, bufin, client),
-            _ => panic!("There's nothing we can do | Nous pouvons rien faire"),
-        }
+        self.get_event_func(packet_id)(&self, packet_id, bufin, client);
     }
 
     pub fn mainloop(&self) {

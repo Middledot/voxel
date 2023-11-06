@@ -29,7 +29,7 @@ impl MsgBuffer {
     }
 
     pub fn at_end(&mut self) -> bool {
-        self.pos == self.buffer.len() - 1
+        self.pos == self.buffer.len()
     }
 
     pub fn into_bytes(&mut self) -> &Vec<u8> {

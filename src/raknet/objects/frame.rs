@@ -15,6 +15,7 @@ pub struct Frame {
     bodysize: u16,
     reliability: Reliability,
     fragment_info: FragmentInfo,
+    pub body: Vec<u8>,
 }
 
 impl Frame {
@@ -53,6 +54,7 @@ impl Frame {
             bodysize,
             reliability,
             fragment_info,
+            body,
         }
     }
 }

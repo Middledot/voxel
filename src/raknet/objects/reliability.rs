@@ -24,14 +24,14 @@ impl ReliabilityType {
         // 100 = 4?
         // vvv = 2???
         match (flags & 0b11100000) >> 5 {
-            0 => ReliabilityType::Unreliable,
-            1 => ReliabilityType::UnreliableSequenced,
-            2 => ReliabilityType::Reliable,
-            3 => ReliabilityType::ReliableOrdered,
-            4 => ReliabilityType::ReliableSequenced,
-            5 => ReliabilityType::UnreliableACK,
-            6 => ReliabilityType::ReliableACK,
-            7 => ReliabilityType::ReliableOrderedACK,
+            0 => ReliabilityType::Unreliable,  // 000
+            1 => ReliabilityType::UnreliableSequenced,  // 001
+            2 => ReliabilityType::Reliable,  // 010
+            3 => ReliabilityType::ReliableOrdered,  // 011
+            4 => ReliabilityType::ReliableSequenced,  // 100
+            5 => ReliabilityType::UnreliableACK,  // 101
+            6 => ReliabilityType::ReliableACK,  // 110
+            7 => ReliabilityType::ReliableOrderedACK,  // 111
             _ => panic!("Uhm, excuse me"),
         }
     }

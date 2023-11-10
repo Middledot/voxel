@@ -5,14 +5,13 @@
 ///
 /// Reference: https://wiki.vg/Raknet_Protocol
 use rand::Rng;
-use std::time::{SystemTime, UNIX_EPOCH};
-use std::net::{SocketAddr, IpAddr, Ipv4Addr};
+use std::net::{SocketAddr, IpAddr};
 use tokio::net::UdpSocket;
 use std::collections::HashMap;
 
 use log::trace;
 
-use super::objects::{Frame, MsgBuffer, datatypes::to_address_bytes};
+use super::objects::{Frame, MsgBuffer};
 use super::packets::*;
 use super::session::{Session, FrameSet};
 use crate::config::Config;
@@ -159,45 +158,7 @@ impl RakNetServer {
         for mut packet in packets_to_send {
             self.socket.send_to(packet.into_bytes(), client).await;
         }
-
-        // let output = self.get_event_func(new_packet_id)(&mut self, new_packet_id, new_bufin, client);
     }
-
-    // pub fn conn_req(&mut self, packet_id: u8, mut bufin: MsgBuffer, client: SocketAddr) -> Vec<u8> {
-    //     let apparently_some_unknown_guid = bufin.read_i64_be_bytes();
-    //     let timestamp = bufin.read_i64_be_bytes();
-
-    //     println!("{:?}", apparently_some_unknown_guid);
-
-    //     let mut bufout = MsgBuffer::new();
-    //     bufout.write_address(&client);
-    //     bufout.write_i16_be_bytes(&0);  // like, ok
-    //     let mystery_address = to_address_bytes(
-    //         &SocketAddr::new(IpAddr::V4(Ipv4Addr::new(255, 255, 255, 255)), 19132)
-    //     );
-    //     for _ in 0..10 {
-    //         bufout.write(&mystery_address);
-    //     }
-    //     bufout.write_i64_be_bytes(&timestamp);
-    //     bufout.write_i64_be_bytes(&(SystemTime::now().duration_since(UNIX_EPOCH).expect("Oops").as_millis() as i64));
-
-    //     *bufout.into_bytes()
-    //     // self.socket.send_to(bufout.into_bytes(), client).expect("Zamn");
-    //     // trace!("SENT = {:?}", bufout.into_bytes());
-    // }
-
-    // pub fn get_event_func(&mut self, packet_id: u8) -> async fn(&mut Self, u8, MsgBuffer, SocketAddr) {
-    //     let eventfunc = match packet_id {
-    //         0x01 | 0x02 => RakNetServer::unconnected_ping,
-    //         0x05 => RakNetServer::offline_connection_request_1,
-    //         0x07 => RakNetServer::offline_connection_request_2,
-    //         // 0x09 => RakNetServer::conn_req,
-    //         0x80..=0x8d => RakNetServer::frame_set,
-    //         _ => panic!("There's nothing we can do | Nous pouvons rien faire"),
-    //     };
-
-    //     eventfunc
-    // }
 
     pub async fn call_offline_event(&mut self, packet_id: u8, bufin: MsgBuffer, client: SocketAddr) {
         match packet_id {

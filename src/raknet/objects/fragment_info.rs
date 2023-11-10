@@ -1,8 +1,9 @@
 /// raknet/objects/fragment_info.rs
-/// ================
-///
+/// ===============================
+/// 
 /// Class that holds information on fragments. To be
 /// developed on more later. Refer to frame.rs.
+
 use super::msgbuffer::MsgBuffer;
 
 pub struct FragmentInfo {

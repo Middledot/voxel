@@ -4,6 +4,49 @@ use crate::raknet::objects::MsgBuffer;
 
 use super::obj::{Deserialise, Serialize};
 
+
+pub struct OfflinePing {
+    pub timestamp: i64,
+    pub magic: [u8; 16],
+    pub client_guid: i64,
+}
+
+impl Deserialise for OfflinePing {
+    fn deserialise(buf: &mut MsgBuffer) -> Self {
+        // keep client_timestamp instead of timestamp the
+        // distinction might be important in the future idk
+        let client_timestamp = buf.read_i64_be_bytes();
+        let magic = buf.read_magic();
+        let client_guid = buf.read_i64_be_bytes();
+
+        Self {
+            timestamp: client_timestamp,
+            magic: magic,
+            client_guid: client_guid,
+        }
+    }
+}
+
+pub struct OfflinePong {
+    pub timestamp: i64,
+    pub server_guid: i64,
+    pub magic: [u8; 16],
+    pub server_name: String,
+}
+
+impl Serialize for OfflinePong {
+    fn serialize(&self) -> MsgBuffer {
+        let mut buf = MsgBuffer::new();
+        buf.write_i64_be_bytes(&self.timestamp);
+        buf.write_i64_be_bytes(&self.server_guid);
+        buf.write_magic(&self.magic);
+        buf.write_string(&self.server_name);
+
+        buf
+    }
+}
+
+
 pub struct OfflineConnReq1 {
     pub magic: [u8; 16],
     pub protocol: u8, // mysterious magical mystical value, unknown use (always 0x11)
@@ -11,8 +54,6 @@ pub struct OfflineConnReq1 {
 }
 
 impl Deserialise for OfflineConnReq1 {
-    const ID: u8 = 0x05;
-
     fn deserialise(buf: &mut MsgBuffer) -> Self {
         let magic = buf.read_magic();
         let protocol = buf.read_byte();
@@ -26,6 +67,7 @@ impl Deserialise for OfflineConnReq1 {
     }
 }
 
+
 pub struct OfflineConnRep1 {
     pub magic: [u8; 16],
     pub server_guid: i64,
@@ -34,8 +76,6 @@ pub struct OfflineConnRep1 {
 }
 
 impl Serialize for OfflineConnRep1 {
-    const ID: u8 = 0x06;
-
     fn serialize(&self) -> MsgBuffer {
         let mut buf = MsgBuffer::new();
         buf.write_magic(&self.magic);
@@ -47,6 +87,7 @@ impl Serialize for OfflineConnRep1 {
     }
 }
 
+
 pub struct OfflineConnReq2 {
     pub magic: [u8; 16],
     pub server_address: SocketAddr,
@@ -55,8 +96,6 @@ pub struct OfflineConnReq2 {
 }
 
 impl Deserialise for OfflineConnReq2 {
-    const ID: u8 = 0x07;
-
     fn deserialise(buf: &mut MsgBuffer) -> Self {
         let magic = buf.read_magic();
         let server_address = buf.read_address();
@@ -81,8 +120,6 @@ pub struct OfflineConnRep2 {
 }
 
 impl Serialize for OfflineConnRep2 {
-    const ID: u8 = 0x08;
-
     fn serialize(&self) -> MsgBuffer {
         let mut buf = MsgBuffer::new();
         buf.write_magic(&self.magic);

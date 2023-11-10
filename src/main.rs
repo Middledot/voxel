@@ -36,6 +36,6 @@ async fn main() {
         .unwrap();
     let _handle = log4rs::init_config(logconfig).unwrap();
 
-    let mut raknet_server = raknet::server::RakNetServer::bind(config); // later, make config reference for raknet, and VoxelServer owner
-    raknet_server.mainloop();
+    let mut raknet_server = raknet::server::RakNetServer::bind(config).await; // later, make config reference for raknet, and VoxelServer owner
+    raknet_server.mainloop().await;
 }

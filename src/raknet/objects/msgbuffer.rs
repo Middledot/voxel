@@ -175,3 +175,9 @@ impl MsgBuffer {
         self.write(&to_address_bytes(&address));
     }
 }
+
+impl std::fmt::Debug for MsgBuffer {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:?}", &self.buffer)
+    }
+}

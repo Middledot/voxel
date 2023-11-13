@@ -46,6 +46,7 @@ pub struct Reliability {
 }
 
 impl Reliability {
+    // resource: http://www.jenkinssoftware.com/raknet/manual/reliabilitytypes.html
     pub fn new(flags: u8) -> Self {
         Self {
             _type: ReliabilityType::from_flags(flags),
@@ -103,6 +104,15 @@ impl Reliability {
 
     pub fn get_type(&mut self) -> &ReliabilityType {
         &self._type
+    }
+
+    pub fn is_unreliable(&mut self) -> bool {
+        if let ReliabilityType::Unreliable
+        | ReliabilityType::UnreliableSequenced = self.get_type()
+        {
+            return true;
+        }
+        return false;
     }
 
     pub fn is_reliable(&mut self) -> bool {

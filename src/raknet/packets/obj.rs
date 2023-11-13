@@ -1,9 +1,9 @@
 use crate::raknet::objects::MsgBuffer;
 
-pub trait Deserialise {
-    fn deserialise(buf: &mut MsgBuffer) -> Self;
+pub trait FromBuffer {
+    fn from_buffer(buf: &mut MsgBuffer) -> Self;
 }
 
-pub trait Serialize {
-    fn serialize(&self) -> MsgBuffer;
+pub trait ToBuffer {
+    fn to_buffer(&self) -> MsgBuffer;
 }

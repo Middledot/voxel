@@ -1,4 +1,4 @@
-use super::obj::{Deserialise, Serialize};
+use super::obj::{FromBuffer, ToBuffer};
 use crate::raknet::objects::MsgBuffer;
 
 // TODO: acknack can have many bodies of records
@@ -68,14 +68,14 @@ pub struct Ack {
     pub records: Vec<u32>,
 }
 
-impl Serialize for Ack {
-    fn serialize(&self) -> MsgBuffer {
+impl ToBuffer for Ack {
+    fn to_buffer(&self) -> MsgBuffer {
         write_body(&self.records, 0xc0)
     }
 }
 
-impl Deserialise for Ack {
-    fn deserialise(buf: &mut MsgBuffer) -> Self {
+impl FromBuffer for Ack {
+    fn from_buffer(buf: &mut MsgBuffer) -> Self {
         Self {
             records: read_body(buf),
         }
@@ -86,14 +86,14 @@ pub struct Nack {
     pub records: Vec<u32>,
 }
 
-impl Serialize for Nack {
-    fn serialize(&self) -> MsgBuffer {
+impl ToBuffer for Nack {
+    fn to_buffer(&self) -> MsgBuffer {
         write_body(&self.records, 0xa0)
     }
 }
 
-impl Deserialise for Nack {
-    fn deserialise(buf: &mut MsgBuffer) -> Self {
+impl FromBuffer for Nack {
+    fn from_buffer(buf: &mut MsgBuffer) -> Self {
         Self {
             records: read_body(buf),
         }

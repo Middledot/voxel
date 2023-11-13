@@ -60,9 +60,9 @@ impl RakNetServer {
 
     pub async fn send_packet<T>(&mut self, packet_id: u8, packet: &T, client: SocketAddr)
     where
-        T: Serialize,
+        T: ToBuffer,
     {
-        let mut serialized = packet.serialize();
+        let mut serialized = packet.to_buffer();
         let body = serialized.get_bytes();
         let mut bytes = vec![packet_id];
         bytes.extend_from_slice(body);
@@ -83,7 +83,7 @@ impl RakNetServer {
         mut bufin: MsgBuffer,
         client: SocketAddr,
     ) {
-        let offline_ping = OfflinePing::deserialise(&mut bufin);
+        let offline_ping = OfflinePing::from_buffer(&mut bufin);
 
         let offline_pong = OfflinePong {
             timestamp: offline_ping.timestamp,
@@ -101,7 +101,7 @@ impl RakNetServer {
         mut bufin: MsgBuffer,
         client: SocketAddr,
     ) {
-        let offline_conn_req_1 = OfflineConnReq1::deserialise(&mut bufin);
+        let offline_conn_req_1 = OfflineConnReq1::from_buffer(&mut bufin);
 
         let offline_conn_rep_1 = OfflineConnRep1 {
             magic: offline_conn_req_1.magic,
@@ -119,7 +119,7 @@ impl RakNetServer {
         mut bufin: MsgBuffer,
         client: SocketAddr,
     ) {
-        let offline_conn_req_2 = OfflineConnReq2::deserialise(&mut bufin);
+        let offline_conn_req_2 = OfflineConnReq2::from_buffer(&mut bufin);
 
         let offline_conn_rep_2 = OfflineConnRep2 {
             magic: offline_conn_req_2.magic,
@@ -212,7 +212,7 @@ impl RakNetServer {
             .get_mut(&(client.ip(), client.port()))
             .unwrap();
         match packet_id {
-            0xC0 => sess.recv_ack(Ack::deserialise(&mut bufin)),
+            0xC0 => sess.recv_ack(Ack::from_buffer(&mut bufin)),
             _ => panic!("There's nothing we can do | Nous pouvons rien faire"),
         }
     }

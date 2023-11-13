@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 
 use crate::raknet::objects::MsgBuffer;
 
-use super::obj::{Deserialise, Serialize};
+use super::obj::{FromBuffer, ToBuffer};
 
 pub struct OfflinePing {
     pub timestamp: i64,
@@ -10,8 +10,8 @@ pub struct OfflinePing {
     pub client_guid: i64,
 }
 
-impl Deserialise for OfflinePing {
-    fn deserialise(buf: &mut MsgBuffer) -> Self {
+impl FromBuffer for OfflinePing {
+    fn from_buffer(buf: &mut MsgBuffer) -> Self {
         // keep client_timestamp instead of timestamp the
         // distinction might be important in the future idk
         let client_timestamp = buf.read_i64_be_bytes();
@@ -33,8 +33,8 @@ pub struct OfflinePong {
     pub server_name: String,
 }
 
-impl Serialize for OfflinePong {
-    fn serialize(&self) -> MsgBuffer {
+impl ToBuffer for OfflinePong {
+    fn to_buffer(&self) -> MsgBuffer {
         let mut buf = MsgBuffer::new();
         buf.write_i64_be_bytes(&self.timestamp);
         buf.write_i64_be_bytes(&self.server_guid);
@@ -51,8 +51,8 @@ pub struct OfflineConnReq1 {
     pub mtu: i16,
 }
 
-impl Deserialise for OfflineConnReq1 {
-    fn deserialise(buf: &mut MsgBuffer) -> Self {
+impl FromBuffer for OfflineConnReq1 {
+    fn from_buffer(buf: &mut MsgBuffer) -> Self {
         let magic = buf.read_magic();
         let protocol = buf.read_byte();
         let mtu = (buf.len_rest() + 46) as i16;
@@ -72,8 +72,8 @@ pub struct OfflineConnRep1 {
     pub mtu: i16,
 }
 
-impl Serialize for OfflineConnRep1 {
-    fn serialize(&self) -> MsgBuffer {
+impl ToBuffer for OfflineConnRep1 {
+    fn to_buffer(&self) -> MsgBuffer {
         let mut buf = MsgBuffer::new();
         buf.write_magic(&self.magic);
         buf.write_i64_be_bytes(&self.server_guid);
@@ -91,8 +91,8 @@ pub struct OfflineConnReq2 {
     pub client_guid: i64,
 }
 
-impl Deserialise for OfflineConnReq2 {
-    fn deserialise(buf: &mut MsgBuffer) -> Self {
+impl FromBuffer for OfflineConnReq2 {
+    fn from_buffer(buf: &mut MsgBuffer) -> Self {
         let magic = buf.read_magic();
         let server_address = buf.read_address();
         let mtu = buf.read_i16_be_bytes();
@@ -115,8 +115,8 @@ pub struct OfflineConnRep2 {
     pub use_encryption: bool,
 }
 
-impl Serialize for OfflineConnRep2 {
-    fn serialize(&self) -> MsgBuffer {
+impl ToBuffer for OfflineConnRep2 {
+    fn to_buffer(&self) -> MsgBuffer {
         let mut buf = MsgBuffer::new();
         buf.write_magic(&self.magic);
         buf.write_i64_be_bytes(&self.server_guid);

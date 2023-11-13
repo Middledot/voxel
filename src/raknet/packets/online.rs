@@ -1,7 +1,7 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use super::{Deserialise, Serialize};
+use super::{FromBuffer, ToBuffer};
 use crate::raknet::objects::{datatypes::to_address_bytes, MsgBuffer};
 
 pub struct OnlineConnReq {
@@ -9,8 +9,8 @@ pub struct OnlineConnReq {
     pub timestamp: i64,
 }
 
-impl Deserialise for OnlineConnReq {
-    fn deserialise(buf: &mut MsgBuffer) -> Self {
+impl FromBuffer for OnlineConnReq {
+    fn from_buffer(buf: &mut MsgBuffer) -> Self {
         let guid = buf.read_i64_be_bytes();
         let timestamp = buf.read_i64_be_bytes();
 
@@ -25,8 +25,8 @@ pub struct OnlineConnAccepted {
     pub timestamp: i64,
 }
 
-impl Serialize for OnlineConnAccepted {
-    fn serialize(&self) -> MsgBuffer {
+impl ToBuffer for OnlineConnAccepted {
+    fn to_buffer(&self) -> MsgBuffer {
         let mut buf = MsgBuffer::new();
         buf.write_address(&self.client_address);
         buf.write_i16_be_bytes(&0); // like, ok

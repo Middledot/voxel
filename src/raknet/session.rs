@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 use super::objects::Frame;
 use super::objects::MsgBuffer;
 use super::packets::{Ack, Nack, OnlineConnAccepted, OnlineConnReq};
-use super::packets::{Deserialise, Serialize};
+use super::packets::{FromBuffer, ToBuffer};
 
 pub struct FrameSet {
     pub index: u32,
@@ -38,13 +38,13 @@ impl Session {
     }
 
     pub async fn online_conn_req(&mut self, mut frame: Frame) {
-        let conn_req = OnlineConnReq::deserialise(&mut frame.body);
+        let conn_req = OnlineConnReq::from_buffer(&mut frame.body);
 
         let mut conn_accept = OnlineConnAccepted {
             client_address: self.sockaddr,
             timestamp: conn_req.timestamp,
         }
-        .serialize();
+        .to_buffer();
 
         let mut respframe = Frame {
             flags: frame.flags,
@@ -77,7 +77,7 @@ impl Session {
             .unwrap()
             .retain(|val| records.contains(val));
 
-        Nack { records }.serialize()
+        Nack { records }.to_buffer()
     }
 
     pub fn create_ack(&mut self, first: u32, until: u32) -> MsgBuffer {
@@ -87,7 +87,7 @@ impl Session {
             self.missing_records.lock().unwrap().push(*rec);
         }
 
-        Ack { records }.serialize()
+        Ack { records }.to_buffer()
     }
 
     pub fn recv_ack(&mut self, _records: Ack) {

@@ -22,17 +22,14 @@ impl MsgBuffer {
     }
 
     pub fn from(buffer: Vec<u8>) -> Self {
-        Self {
-            buffer: buffer,
-            pos: 0,
-        }
+        Self { buffer, pos: 0 }
     }
 
     pub fn at_end(&mut self) -> bool {
         self.pos == self.buffer.len()
     }
 
-    pub fn into_bytes(&mut self) -> &Vec<u8> {
+    pub fn get_bytes(&mut self) -> &Vec<u8> {
         &self.buffer
     }
 
@@ -54,12 +51,6 @@ impl MsgBuffer {
     pub fn read_vec(&mut self, num: usize) -> Vec<u8> {
         let res = self.buffer[self.pos..self.pos + num].to_vec();
         self.pos += num;
-
-        res
-    }
-
-    pub fn read_rest(&mut self) -> Vec<u8> {
-        let res = self.buffer[self.pos..].to_vec();
 
         res
     }
@@ -156,27 +147,25 @@ impl MsgBuffer {
 
     pub fn read_address(&mut self) -> SocketAddr {
         let ipver = self.read_byte();
-        let address: SocketAddr;
+
         if ipver == 0x04 {
             let mut bytes = [0u8; 6]; // 7-1
             self.read(6, &mut bytes);
-            address = from_address_bytes(ipver, &bytes.to_vec());
+            from_address_bytes(ipver, &bytes.to_vec())
         } else {
             // if ipver == 0x06
             let mut bytes = [0u8; 28]; // 29-1
             self.read(28, &mut bytes);
-            address = from_address_bytes(ipver, &bytes.to_vec());
+            from_address_bytes(ipver, &bytes.to_vec())
         }
-
-        address
     }
 
     pub fn write_address(&mut self, address: &SocketAddr) {
-        self.write(&to_address_bytes(&address));
+        self.write(&to_address_bytes(address));
     }
 
     pub fn write_buffer(&mut self, other: &mut MsgBuffer) {
-        self.buffer.extend_from_slice(other.into_bytes())
+        self.buffer.extend_from_slice(other.get_bytes())
     }
 }
 

@@ -2,9 +2,9 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 
-use super::objects::MsgBuffer;
 use super::objects::Frame;
-use super::packets::{ACK, NACK, OnlineConnReq, OnlineConnAccepted};
+use super::objects::MsgBuffer;
+use super::packets::{Ack, Nack, OnlineConnAccepted, OnlineConnReq};
 use super::packets::{Deserialise, Serialize};
 
 pub struct FrameSet {
@@ -24,15 +24,11 @@ pub struct Session {
 }
 
 impl Session {
-    pub fn new(
-        sockaddr: SocketAddr,
-        client_guid: i64,
-        mtu: i16,
-    ) -> Self {
+    pub fn new(sockaddr: SocketAddr, client_guid: i64, mtu: i16) -> Self {
         Self {
-            sockaddr: sockaddr,
+            sockaddr,
             guid: client_guid,
-            mtu: mtu,
+            mtu,
             server_frame_set_index: 0,
             client_frame_set_index: 0,
             frames_queue: Arc::new(Mutex::new(vec![])),
@@ -41,13 +37,14 @@ impl Session {
         }
     }
 
-    pub async fn online_conn_req(&mut self, mut frame: Frame)  {
+    pub async fn online_conn_req(&mut self, mut frame: Frame) {
         let conn_req = OnlineConnReq::deserialise(&mut frame.body);
 
         let mut conn_accept = OnlineConnAccepted {
             client_address: self.sockaddr,
             timestamp: conn_req.timestamp,
-        }.serialize();
+        }
+        .serialize();
 
         let mut respframe = Frame {
             flags: frame.flags,
@@ -59,23 +56,28 @@ impl Session {
             body: conn_accept,
         };
 
-        self.frames_queue.lock().unwrap().push(respframe.serialize())
+        self.frames_queue
+            .lock()
+            .unwrap()
+            .push(respframe.serialize())
     }
 
     pub async fn call_online_event(&mut self, frame: Frame) {
         match frame.inner_packet_id {
             0x09 => self.online_conn_req(frame).await,
-            _ => panic!("It's joever | C'est joever")
+            _ => panic!("It's joever | C'est joever"),
         }
-        
     }
 
     pub fn create_nack(&mut self, first: u32, until: u32) -> MsgBuffer {
         let records: Vec<u32> = (first..until).collect();
 
-        self.missing_records.lock().unwrap().retain(|val| records.contains(val));
+        self.missing_records
+            .lock()
+            .unwrap()
+            .retain(|val| records.contains(val));
 
-        NACK {records}.serialize()
+        Nack { records }.serialize()
     }
 
     pub fn create_ack(&mut self, first: u32, until: u32) -> MsgBuffer {
@@ -85,23 +87,24 @@ impl Session {
             self.missing_records.lock().unwrap().push(*rec);
         }
 
-        ACK {records}.serialize()
+        Ack { records }.serialize()
     }
 
-    pub fn recv_ack(&mut self, records: ACK) {
+    pub fn recv_ack(&mut self, _records: Ack) {
         // TODO
     }
 
     pub async fn recv_frame_set(&mut self, frame_set: FrameSet) -> Vec<MsgBuffer> {
         let mut packets_to_send: Vec<MsgBuffer> = vec![];
 
-        // First check for missing frames and sending NACKs
-        if frame_set.index > self.client_frame_set_index+1 {
-            packets_to_send.push(self.create_nack(self.client_frame_set_index+1, frame_set.index));
+        // First check for missing frames and sending Nacks
+        if frame_set.index > self.client_frame_set_index + 1 {
+            packets_to_send
+                .push(self.create_nack(self.client_frame_set_index + 1, frame_set.index));
         }
 
-        // As well as an ACK
-        packets_to_send.push(self.create_ack(frame_set.index, frame_set.index+1));
+        // As well as an Ack
+        packets_to_send.push(self.create_ack(frame_set.index, frame_set.index + 1));
 
         self.client_frame_set_index = frame_set.index;
 

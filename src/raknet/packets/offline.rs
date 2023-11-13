@@ -4,7 +4,6 @@ use crate::raknet::objects::MsgBuffer;
 
 use super::obj::{Deserialise, Serialize};
 
-
 pub struct OfflinePing {
     pub timestamp: i64,
     pub magic: [u8; 16],
@@ -21,8 +20,8 @@ impl Deserialise for OfflinePing {
 
         Self {
             timestamp: client_timestamp,
-            magic: magic,
-            client_guid: client_guid,
+            magic,
+            client_guid,
         }
     }
 }
@@ -46,7 +45,6 @@ impl Serialize for OfflinePong {
     }
 }
 
-
 pub struct OfflineConnReq1 {
     pub magic: [u8; 16],
     pub protocol: u8, // mysterious magical mystical value, unknown use (always 0x11)
@@ -67,7 +65,6 @@ impl Deserialise for OfflineConnReq1 {
     }
 }
 
-
 pub struct OfflineConnRep1 {
     pub magic: [u8; 16],
     pub server_guid: i64,
@@ -86,7 +83,6 @@ impl Serialize for OfflineConnRep1 {
         buf
     }
 }
-
 
 pub struct OfflineConnReq2 {
     pub magic: [u8; 16],

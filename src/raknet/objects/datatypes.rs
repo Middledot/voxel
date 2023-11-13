@@ -26,10 +26,7 @@ pub fn to_i32_be_bytes(value: &i32) -> [u8; 4] {
 
 pub fn from_u24_le_bytes_to_u32(bytes: [u8; 3]) -> u32 {
     let mut newarr = [0u8; 4];
-    for i in 0..3 {
-        // why
-        newarr[i + 1] = bytes[i];
-    }
+    newarr[1..=3].copy_from_slice(&bytes[..3]);
 
     u32::from_le_bytes(newarr)
 }
@@ -37,9 +34,7 @@ pub fn from_u24_le_bytes_to_u32(bytes: [u8; 3]) -> u32 {
 pub fn to_u24_le_bytes(value: &u32) -> [u8; 3] {
     let result = value.to_le_bytes();
     let mut newarr = [0u8; 3];
-    for i in 0..3 {
-        newarr[i] = result[i + 1];
-    }
+    newarr[..3].copy_from_slice(&result[1..=3]);
 
     newarr
 }
@@ -61,16 +56,16 @@ pub fn to_u16_be_bytes(value: &u16) -> [u8; 2] {
 }
 
 // TODO: test this (especially ipv6)
+#[allow(clippy::ptr_arg)]
 pub fn from_address_bytes(version: u8, bytes: &Vec<u8>) -> SocketAddr {
-    let address: SocketAddr;
     if version == 0x04 {
-        address = SocketAddr::new(
+        SocketAddr::new(
             IpAddr::V4(Ipv4Addr::new(bytes[0], bytes[1], bytes[2], bytes[3])),
             from_u16_be_bytes([bytes[4], bytes[5]]),
-        );
+        )
     } else {
         // ver == 0x06
-        address = SocketAddr::new(
+        SocketAddr::new(
             IpAddr::V6(Ipv6Addr::new(
                 // TODO: rewrite this
                 from_u16_be_bytes([bytes[12], bytes[13]]),
@@ -83,10 +78,8 @@ pub fn from_address_bytes(version: u8, bytes: &Vec<u8>) -> SocketAddr {
                 from_u16_be_bytes([bytes[26], bytes[27]]),
             )),
             from_u16_be_bytes([bytes[1], bytes[2]]),
-        );
+        )
     }
-
-    address
 }
 
 pub fn to_address_bytes(addr: &SocketAddr) -> Vec<u8> {

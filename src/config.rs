@@ -16,18 +16,18 @@ impl Config {
             .expect("server.properties malformed");
 
         let config: HashMap<String, String> = text
-            .split("\n")
+            .split('\n')
             .filter_map(|x| {
                 let item = x;
-                if item.starts_with("#") || !item.contains("=") {
+                if item.starts_with('#') || !item.contains('=') {
                     return None;
                 }
-                let result: Vec<&str> = item.split("=").map(|y| y.trim()).collect();
+                let result: Vec<&str> = item.split('=').map(|y| y.trim()).collect();
                 Some((result[0].to_string(), result[1].to_string()))
             })
             .collect();
 
-        Self { config: config }
+        Self { config }
     }
 
     pub fn get_property(&self, name: &str) -> &String {

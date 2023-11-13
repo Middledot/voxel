@@ -24,13 +24,13 @@ impl ReliabilityType {
         // 100 = 4?
         // vvv = 2???
         match (flags & 0b11100000) >> 5 {
-            0 => ReliabilityType::Unreliable,  // 000
-            1 => ReliabilityType::UnreliableSequenced,  // 001
-            2 => ReliabilityType::Reliable,  // 010
-            3 => ReliabilityType::ReliableOrdered,  // 011
-            4 => ReliabilityType::ReliableSequenced,  // 100
-            5 => ReliabilityType::UnreliableACK,  // 101
-            6 => ReliabilityType::ReliableACK,  // 110
+            0 => ReliabilityType::Unreliable,          // 000
+            1 => ReliabilityType::UnreliableSequenced, // 001
+            2 => ReliabilityType::Reliable,            // 010
+            3 => ReliabilityType::ReliableOrdered,     // 011
+            4 => ReliabilityType::ReliableSequenced,   // 100
+            5 => ReliabilityType::UnreliableACK,       // 101
+            6 => ReliabilityType::ReliableACK,         // 110
             7 => ReliabilityType::ReliableOrderedACK,  // 111
             _ => panic!("Uhm, excuse me"),
         }
@@ -107,12 +107,11 @@ impl Reliability {
     }
 
     pub fn is_unreliable(&mut self) -> bool {
-        if let ReliabilityType::Unreliable
-        | ReliabilityType::UnreliableSequenced = self.get_type()
+        if let ReliabilityType::Unreliable | ReliabilityType::UnreliableSequenced = self.get_type()
         {
             return true;
         }
-        return false;
+        false
     }
 
     pub fn is_reliable(&mut self) -> bool {
@@ -124,7 +123,7 @@ impl Reliability {
         {
             return true;
         }
-        return false;
+        false
     }
 
     pub fn is_sequenced(&mut self) -> bool {
@@ -133,7 +132,7 @@ impl Reliability {
         {
             return true;
         }
-        return false;
+        false
     }
 
     pub fn is_ordered(&mut self) -> bool {
@@ -146,6 +145,6 @@ impl Reliability {
         {
             return true;
         }
-        return false;
+        false
     }
 }

@@ -62,7 +62,6 @@ impl Frame {
 
     pub fn serialize(&mut self) -> MsgBuffer {
         let mut buf = MsgBuffer::new();
-        buf.write_byte(0x84);
         buf.write_byte(self.flags);
         buf.write_u16_be_bytes(&self.bitlength);
         buf.write_u16_be_bytes(&self.bodysize);

@@ -212,7 +212,8 @@ impl RakNetServer {
             .get_mut(&(client.ip(), client.port()))
             .unwrap();
         match packet_id {
-            0xC0 => sess.recv_ack(Ack::from_buffer(&mut bufin)),
+            0xc0 => sess.recv_ack(Ack::from_buffer(&mut bufin)),
+            0x80..=0x8d => self.recv_frame_set(packet_id, bufin, client).await,
             _ => panic!("There's nothing we can do | Nous pouvons rien faire"),
         }
     }
@@ -233,10 +234,10 @@ impl RakNetServer {
             let bufin = MsgBuffer::from(body.to_vec());
 
             match packet_id {
-                0x01 | 0x02 | 0x05 | 0x07 | 0x80..=0x8d => {
+                0x01 | 0x02 | 0x05 | 0x07 => {
                     self.call_offline_event(packet_id, bufin, client).await
                 }
-                0xc0 => self.call_online_event(packet_id, bufin, client).await,
+                0xc0 | 0xa0 | 0x80..=0x8d => self.call_online_event(packet_id, bufin, client).await,
                 _ => panic!("There's nothing we can do | Nous pouvons rien faire"),
             }
         }

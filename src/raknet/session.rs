@@ -12,13 +12,27 @@ pub struct FrameSet {
     pub frames: Vec<Frame>,
 }
 
+impl FrameSet {
+    fn to_buffer(&mut self) -> MsgBuffer {
+        let mut buf = MsgBuffer::new();
+        buf.write_byte(0x84);
+        buf.write_u24_le_bytes(&self.index);
+
+        for fr in self.frames.iter_mut() {
+            buf.write_buffer(&mut fr.serialize());
+        }
+
+        buf
+    }
+}
+
 pub struct Session {
     pub sockaddr: SocketAddr,
     guid: i64,
     mtu: i16,
     server_frame_set_index: u32,
     client_frame_set_index: u32,
-    frames_queue: Arc<Mutex<Vec<MsgBuffer>>>,
+    frames_queue: Arc<Mutex<Vec<Frame>>>,
     resend_queue: Arc<Mutex<HashMap<u32, FrameSet>>>,
     missing_records: Arc<Mutex<Vec<u32>>>,
 }
@@ -46,7 +60,7 @@ impl Session {
         }
         .to_buffer();
 
-        let mut respframe = Frame {
+        let respframe = Frame {
             flags: frame.flags,
             bitlength: (conn_accept.len() * 8) as u16,
             bodysize: conn_accept.len() as u16,
@@ -59,7 +73,7 @@ impl Session {
         self.frames_queue
             .lock()
             .unwrap()
-            .push(respframe.serialize())
+            .push(respframe)
     }
 
     pub async fn call_online_event(&mut self, frame: Frame) {
@@ -90,8 +104,12 @@ impl Session {
         Ack { records }.to_buffer()
     }
 
-    pub fn recv_ack(&mut self, _records: Ack) {
-        // TODO
+    pub fn recv_ack(&mut self, ack_packet: Ack) {
+        let mut resend_queue = self.resend_queue.lock().unwrap();
+
+        for rec in ack_packet.records {
+            resend_queue.remove(&rec);
+        }
     }
 
     pub async fn recv_frame_set(&mut self, frame_set: FrameSet) -> Vec<MsgBuffer> {
@@ -115,10 +133,17 @@ impl Session {
         // package everything currently
 
         let mut frames_queue = self.frames_queue.lock().unwrap();
+        self.server_frame_set_index += 1;
+
+        let mut new_frame_set = FrameSet {index: self.server_frame_set_index, frames: vec![]};
         for _ in 0..frames_queue.len() {
-            packets_to_send.push(frames_queue.remove(0));
+            new_frame_set.frames.push(frames_queue.remove(0));
         }
 
+        // TODO: wtf is this:
+        // [132, 0, 0, 0, 64, 2, 248, 0, 95, 0, 0, 0, 4, 127, 0, 0, 1, 235, 158, 0, 0, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 0, 0, 0, 2, 112, 138, 54, 252, 0, 0, 1, 139, 198, 176, 186, 127]
+
+        packets_to_send.push(new_frame_set.to_buffer());
         packets_to_send
     }
 }

@@ -167,13 +167,15 @@ impl RakNetServer {
             0x05 => self.offline_connection_request_1(packet_id, bufin, client).await,
             0x07 => self.offline_connection_request_2(packet_id, bufin, client).await,
             0x80..=0x8d => self.recv_frame_set(packet_id, bufin, client).await,
+            _ => panic!("There's nothing we can do | Nous pouvons rien faire"),
         };
     }
 
-    pub async fn call_online_event(&mut self, packet_id: u8, bufin: MsgBuffer, client: SocketAddr) {
-        let mut sess = self.sessions.get_mut(&(client.ip(), client.port())).unwrap();
+    pub async fn call_online_event(&mut self, packet_id: u8, bufin: &mut MsgBuffer, client: SocketAddr) {
+        let sess = self.sessions.get_mut(&(client.ip(), client.port())).unwrap();
         match packet_id {
-            0xC0 => sess.recv_ack(ACK::deserialise(&mut bufin))
+            0xC0 => sess.recv_ack(ACK::deserialise(bufin)),
+            _ => panic!("There's nothing we can do | Nous pouvons rien faire"),
         }
     }
 

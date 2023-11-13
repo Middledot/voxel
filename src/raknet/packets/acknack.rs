@@ -4,6 +4,8 @@ use crate::raknet::objects::MsgBuffer;
 // TODO: acknack can have many bodies of records
 
 fn write_body(input_records: &Vec<u32>, id: u8) -> MsgBuffer {
+    // TODO: for some reason it sends this:
+    // [192, 0, 1, 1, 0, 0, 0, 0, 0, 0]
     let mut acknack = MsgBuffer::new();
     acknack.write_byte(id);
 
@@ -34,9 +36,7 @@ fn write_body(input_records: &Vec<u32>, id: u8) -> MsgBuffer {
 }
 
 fn read_body(buf: &mut MsgBuffer) -> Vec<u32> {
-    buf.read_byte();
-    buf.read_i16_be_bytes();
-
+    let _record_count = buf.read_i16_be_bytes();
     let mut records: Vec<u32> = vec![];
 
     loop {
@@ -44,15 +44,13 @@ fn read_body(buf: &mut MsgBuffer) -> Vec<u32> {
             break;
         }
 
-        let is_range = buf.read_byte() != 0;
+        let is_range = buf.read_byte() != 1;
 
         if !is_range {
-            buf.read_byte();
             let record = buf.read_u24_le_bytes();
 
             records.push(record);
         } else {
-            buf.read_byte();
             let start_index = buf.read_u24_le_bytes();
             let end_index = buf.read_u24_le_bytes();
 

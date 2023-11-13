@@ -22,3 +22,10 @@
 //     Ack = 0xc0,
 //     GamePacket = 0xfe,
 // }
+
+pub enum Gamemode {
+    Survival = 0,
+    Creative,
+    Adventure,
+    Spectator,
+}

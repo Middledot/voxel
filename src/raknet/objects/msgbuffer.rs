@@ -174,6 +174,10 @@ impl MsgBuffer {
     pub fn write_address(&mut self, address: &SocketAddr) {
         self.write(&to_address_bytes(&address));
     }
+
+    pub fn write_buffer(&mut self, other: &mut MsgBuffer) {
+        self.buffer.extend_from_slice(other.into_bytes())
+    }
 }
 
 impl std::fmt::Debug for MsgBuffer {

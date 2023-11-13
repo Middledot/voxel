@@ -74,14 +74,13 @@ impl RakNetServer {
             .await
             .expect("Sending packet failed");
 
-        trace!("SENT = {:?}", body);
+        if !packet_id == 0x1c {
+            trace!("0x{packet_id} SENT = {body:?}");
+        }
     }
 
     pub async fn unconnected_ping(&mut self, packet_id: u8, mut bufin: MsgBuffer, client: SocketAddr) {
         let offline_ping = OfflinePing::deserialise(&mut bufin);
-
-        println!("{:?}", offline_ping.client_guid);
-        println!("{:?}", self.server_guid);
 
         let offline_pong = OfflinePong {
             timestamp: offline_ping.timestamp,
@@ -153,10 +152,12 @@ impl RakNetServer {
 
         let sess = self.sessions.get_mut(&(client.ip(), client.port())).unwrap();
 
-        let packets_to_send = sess.receive_frame_set(frame_set).await;
+        let packets_to_send = sess.recv_frame_set(frame_set).await;
 
         for mut packet in packets_to_send {
-            self.socket.send_to(packet.into_bytes(), client).await;
+            self.socket.send_to(packet.into_bytes(), client).await.expect("damn");
+            let bytes = packet.into_bytes();
+            trace!("SENT = {bytes:?}");
         }
     }
 
@@ -166,22 +167,36 @@ impl RakNetServer {
             0x05 => self.offline_connection_request_1(packet_id, bufin, client).await,
             0x07 => self.offline_connection_request_2(packet_id, bufin, client).await,
             0x80..=0x8d => self.recv_frame_set(packet_id, bufin, client).await,
-            _ => panic!("There's nothing we can do | Nous pouvons rien faire"),
         };
     }
 
+    pub async fn call_online_event(&mut self, packet_id: u8, bufin: MsgBuffer, client: SocketAddr) {
+        let mut sess = self.sessions.get_mut(&(client.ip(), client.port())).unwrap();
+        match packet_id {
+            0xC0 => sess.recv_ack(ACK::deserialise(&mut bufin))
+        }
+    }
+
     pub async fn mainloop(&mut self) {
-        let mut buf = [0u8; 1024]; // 1kb
+        let mut buf = [0u8; 2048]; // 2kb
 
         loop {
             let (packetsize, client) = match self.socket.recv_from(&mut buf).await {
                 Ok((packetsize, client)) => (packetsize, client),
                 Err(_e) => continue, // panic!("recv function failed: {e:?}"),
             };
-            trace!("RECV = {:?}", &buf[..packetsize]);
-            let bufin = MsgBuffer::from(buf[1..packetsize].to_vec());
+            let packet_id = buf[0];
+            let body = &buf[1..packetsize];
+            if !(buf[0] == 0x01 || buf[0] == 0x02) {
+                trace!("0x{packet_id} RECV = {body:?}");
+            }
+            let bufin = MsgBuffer::from(body.to_vec());
 
-            self.call_offline_event(buf[0], bufin, client).await;
+            match packet_id {
+                0x01 | 0x02 | 0x05 | 0x07 | 0x80..=0x8d => self.call_offline_event(packet_id, bufin, client).await,
+
+                _ => panic!("There's nothing we can do | Nous pouvons rien faire"),
+            }
         }
     }
 }

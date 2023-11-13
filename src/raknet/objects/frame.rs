@@ -10,12 +10,13 @@ use super::MsgBuffer;
 use super::Reliability;
 
 pub struct Frame {
-    flags: u8,
-    bitlength: u16, // remove?
-    bodysize: u16,
-    reliability: Reliability,
-    fragment_info: FragmentInfo,
-    pub body: Vec<u8>,
+    pub flags: u8,
+    pub bitlength: u16, // remove?
+    pub bodysize: u16,
+    pub reliability: Reliability,
+    pub fragment_info: FragmentInfo,
+    pub inner_packet_id: u8,
+    pub body: MsgBuffer,
 }
 
 impl Frame {
@@ -35,18 +36,18 @@ impl Frame {
         println!("seq? {:?}", reliability.is_sequenced());
         println!("ord? {:?}", reliability.is_ordered());
 
-        println!("{:?}", &flags);
-        println!("{:?}", &bitlength);
-        println!("{:?}", &bodysize);
-        println!("{:?}", &reliability.rel_frameindex.unwrap_or(234));
-        println!("{:?}", &reliability.seq_frameindex.unwrap_or(234));
-        println!("{:?}", &reliability.ord_frameindex.unwrap_or(234));
-        println!("{:?}", &reliability.ord_channel.unwrap_or(234));
-        println!("{:?}", &fragment_info.compound_size.unwrap_or(234));
-        println!("{:?}", &fragment_info.compound_id.unwrap_or(234));
-        println!("{:?}", &fragment_info.index.unwrap_or(234));
-        let body = buf.read_vec(bodysize as usize);
-        println!("body: {:?}", &body);
+        // println!("{:?}", &flags);
+        // println!("{:?}", &bitlength);
+        // println!("{:?}", &bodysize);
+        // println!("{:?}", &reliability.rel_frameindex.unwrap_or(234));
+        // println!("{:?}", &reliability.seq_frameindex.unwrap_or(234));
+        // println!("{:?}", &reliability.ord_frameindex.unwrap_or(234));
+        // println!("{:?}", &reliability.ord_channel.unwrap_or(234));
+        // println!("{:?}", &fragment_info.compound_size.unwrap_or(234));
+        // println!("{:?}", &fragment_info.compound_id.unwrap_or(234));
+        // println!("{:?}", &fragment_info.index.unwrap_or(234));
+        let mut body = MsgBuffer::from(buf.read_vec(bodysize as usize));
+        let inner_packet_id = body.read_byte();
 
         Self {
             flags,
@@ -54,7 +55,36 @@ impl Frame {
             bodysize,
             reliability,
             fragment_info,
+            inner_packet_id,
             body,
         }
+    }
+
+    pub fn serialize(&mut self) -> MsgBuffer {
+        let mut buf = MsgBuffer::new();
+        buf.write_byte(0x84);
+        buf.write_byte(self.flags);
+        buf.write_u16_be_bytes(&self.bitlength);
+        buf.write_u16_be_bytes(&self.bodysize);
+
+        if self.reliability.is_reliable() {
+            buf.write_u24_le_bytes(&self.reliability.rel_frameindex.unwrap())
+        } else if self.reliability.is_sequenced() {
+            buf.write_u24_le_bytes(&self.reliability.seq_frameindex.unwrap());
+        } else {
+            // ordered
+            buf.write_u24_le_bytes(&self.reliability.ord_frameindex.unwrap());
+            buf.write_byte(self.reliability.ord_channel.unwrap());
+        }
+
+        if self.fragment_info.is_fragmented {
+            buf.write_i32_be_bytes(&self.fragment_info.compound_size.unwrap());
+            buf.write_i16_be_bytes(&self.fragment_info.compound_id.unwrap());
+            buf.write_i32_be_bytes(&self.fragment_info.index.unwrap());
+        }
+
+        buf.write_buffer(&mut self.body);
+
+        buf
     }
 }

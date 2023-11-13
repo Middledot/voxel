@@ -106,7 +106,7 @@ impl MsgBuffer {
 
     pub fn read_i16_be_bytes(&mut self) -> i16 {
         let mut result = [0u8; 2];
-        self.read(8, &mut result);
+        self.read(2, &mut result);
 
         from_i16_be_bytes(result)
     }

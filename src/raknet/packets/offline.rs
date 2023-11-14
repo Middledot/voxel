@@ -12,14 +12,12 @@ pub struct OfflinePing {
 
 impl FromBuffer for OfflinePing {
     fn from_buffer(buf: &mut MsgBuffer) -> Self {
-        // keep client_timestamp instead of timestamp the
-        // distinction might be important in the future idk
-        let client_timestamp = buf.read_i64_be_bytes();
+        let timestamp = buf.read_i64_be_bytes();
         let magic = buf.read_magic();
         let client_guid = buf.read_i64_be_bytes();
 
         Self {
-            timestamp: client_timestamp,
+            timestamp,
             magic,
             client_guid,
         }

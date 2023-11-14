@@ -24,7 +24,7 @@ pub struct RakNetServer {
 }
 
 impl RakNetServer {
-    pub async fn bind(config: Config) -> Self {
+    pub async fn new(config: Config) -> Self {
         let socket = UdpSocket::bind("127.0.0.1:".to_string() + config.get_property("server-port"))
             .await
             .expect("Failed to bind to port");

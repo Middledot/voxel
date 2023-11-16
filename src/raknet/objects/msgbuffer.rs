@@ -10,6 +10,8 @@ use super::datatypes::*;
 
 pub struct Packet {
     pub packet_id: u8,
+    // TODO: if this eventually has a use, change all the time I just
+    // plugged in an outdated timestamp
     pub timestamp: u128,
     pub body: MsgBuffer,
 }
@@ -36,7 +38,7 @@ impl MsgBuffer {
         self.pos == self.buffer.len()
     }
 
-    pub fn get_bytes(&mut self) -> &Vec<u8> {
+    pub fn get_bytes(&self) -> &Vec<u8> {
         &self.buffer
     }
 
@@ -171,8 +173,8 @@ impl MsgBuffer {
         self.write(&to_address_bytes(address));
     }
 
-    pub fn write_buffer(&mut self, other: &mut MsgBuffer) {
-        self.buffer.extend_from_slice(other.get_bytes())
+    pub fn write_buffer(&mut self, other: &Vec<u8>) {
+        self.buffer.extend_from_slice(other)
     }
 }
 

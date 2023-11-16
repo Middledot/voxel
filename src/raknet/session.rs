@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use super::objects::Frame;
 use super::objects::MsgBuffer;
 use super::objects::msgbuffer::Packet;
+use super::objects::datatypes::get_unix_milis;
 use super::packets::{Ack, Nack, OnlineConnAccepted, OnlineConnReq};
 use super::packets::{FromBuffer, ToBuffer};
 use super::packets::*;
@@ -15,12 +16,40 @@ pub struct FrameSet {
 }
 
 impl FrameSet {
-    fn to_buffer(&mut self) -> MsgBuffer {
+    pub fn currentsize(&self) -> u16 {
+        self.frames.iter().map(|f| f.totalsize()).sum::<u16>() + 4
+    }
+
+    pub fn add_frame(&mut self, frame: Frame) {
+        self.frames.push(frame);
+    }
+}
+
+impl FromBuffer for FrameSet {
+    fn from_buffer(buf: &mut MsgBuffer) -> Self {
+        let index = buf.read_u24_le_bytes();
+        let mut frames: Vec<Frame> = vec![];
+
+        while !buf.at_end() {
+            frames.push(
+                Frame::from_buffer(buf)
+            )
+        }
+
+        Self {
+            index,
+            frames,
+        }
+    }
+}
+
+impl ToBuffer for FrameSet {
+    fn to_buffer(&self) -> MsgBuffer {
         let mut buf = MsgBuffer::new();
         buf.write_u24_le_bytes(&self.index);
 
-        for fr in self.frames.iter_mut() {
-            buf.write_buffer(&mut fr.serialize());
+        for fr in self.frames.iter() {
+            buf.write_buffer(fr.to_buffer().get_bytes());
         }
 
         buf
@@ -32,8 +61,8 @@ pub struct Session {
     pub guid: i64,
     pub server_guid: i64,
     pub mtu: i16,
-    server_frame_set_index: u32,
-    client_frame_set_index: u32,
+    server_frameset_index: u32,
+    client_frameset_index: u32,
     pub recv_queue: Vec<Packet>,
     pub send_queue: Vec<Packet>,
     frames_queue: Arc<Mutex<Vec<Frame>>>,
@@ -48,8 +77,8 @@ impl Session {
             guid,
             server_guid,
             mtu,
-            server_frame_set_index: 0,
-            client_frame_set_index: 0,
+            server_frameset_index: 0,
+            client_frameset_index: 0,
             recv_queue: vec![],
             send_queue: vec![],
             frames_queue: Arc::new(Mutex::new(vec![])),
@@ -68,19 +97,51 @@ impl Session {
             self.call_event(packet).await;
         }
 
+        self.server_frameset_index += 1;
+
+        let mut frameset = FrameSet {
+            index: self.server_frameset_index,
+            frames: vec![],
+        };
+
+        let mut frames_queue = self.frames_queue.lock().unwrap();
+
+        for _ in 0..frames_queue.len() {
+            let frame = frames_queue.remove(0);
+            if frameset.currentsize() + frame.totalsize() > self.mtu as u16 {
+                self.send_queue.push(
+                    Packet {
+                        packet_id: 0x84,
+                        timestamp: get_unix_milis(),
+                        body: frameset.to_buffer(),
+                    }
+                );
+                self.resend_queue.lock().unwrap().insert(frameset.index, frameset);
+
+                self.server_frameset_index += 1;
+                frameset = FrameSet {
+                    index: self.server_frameset_index,
+                    frames: vec![],
+                };
+            }
+
+            frameset.add_frame(frame);
+        }
+
         std::mem::replace(&mut self.send_queue, vec![])
     }
 
     pub async fn call_event(&mut self, packet: Packet) {
         match packet.packet_id {
-            0x07 => self.recv_offline_connection_request_2(packet),
-            0xa0 => self.recv_nack(packet),
-            0xc0 => self.recv_ack(packet),
-            _ => panic!("Nous pouvons rien faire | There's nothing we can do"),
+            0x07 => self.recv_offline_connection_request_2(packet).await,
+            0xa0 => self.recv_nack(packet).await,
+            0xc0 => self.recv_ack(packet).await,
+            0x80..=0x8d => self.recv_frame_set(packet).await,
+            _ => panic!("Nous pouvons rien faire | There's nothing we can do ({})", packet.packet_id),
         }
     }
 
-    pub fn recv_ack(&mut self, mut packet: Packet) {
+    pub async fn recv_ack(&mut self, mut packet: Packet) {
         let ack_pack = Ack::from_buffer(&mut packet.body);
         let mut resend_queue = self.resend_queue.lock().unwrap();
 
@@ -89,7 +150,7 @@ impl Session {
         }
     }
 
-    pub fn recv_nack(&mut self, mut packet: Packet) {
+    pub async fn recv_nack(&mut self, mut packet: Packet) {
         let nack_pack = Nack::from_buffer(&mut packet.body);
         let mut resend_queue = self.resend_queue.lock().unwrap();
 
@@ -101,14 +162,14 @@ impl Session {
         }
     }
 
-    pub fn recv_offline_connection_request_2(&mut self, mut packet: Packet) {
+    pub async fn recv_offline_connection_request_2(&mut self, mut packet: Packet) {
         let request2 = OfflineConnReq2::from_buffer(&mut packet.body);
 
         let reply2 = OfflineConnRep2 {
             magic: request2.magic,
             server_guid: self.server_guid,
             client_address: self.sockaddr,
-            mtu: self.mtu,
+            mtu: self.mtu as i16,
             use_encryption: false, // disable encryption // TODO: look into? what is this?
         };
 
@@ -123,84 +184,98 @@ impl Session {
         );
     }
 
-    pub async fn online_conn_req(&mut self, mut frame: Frame) {
-        let conn_req = OnlineConnReq::from_buffer(&mut frame.body);
+    pub async fn recv_frame_set(&mut self, mut packet: Packet) {
+        // TODO: wtf is this:
+        // [132, 0, 0, 0, 64, 2, 248, 0, 95, 0, 0, 0, 4, 127, 0, 0, 1, 235, 158, 0, 0, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 0, 0, 0, 2, 112, 138, 54, 252, 0, 0, 1, 139, 198, 176, 186, 127]
+        // also [132, 0, 0, 0, 64, 0, 144, 0, 0, 0, 9, 131, 237, 153, 211, 18, 169, 106, 213, 0, 0, 0, 2, 56, 60, 233, 205, 0]
 
-        let mut conn_accept = OnlineConnAccepted {
-            client_address: self.sockaddr,
-            timestamp: conn_req.timestamp,
+        let frameset = FrameSet::from_buffer(&mut packet.body);
+
+        if frameset.index > self.client_frameset_index + 1 {
+            self.send_nack(self.client_frameset_index + 1, frameset.index);
         }
-        .to_buffer();
+        self.send_ack(frameset.index, frameset.index + 1);
 
-        let respframe = Frame {
-            flags: frame.flags,
-            bitlength: (conn_accept.len() * 8) as u16,
-            bodysize: conn_accept.len() as u16,
-            reliability: frame.reliability,
-            fragment_info: frame.fragment_info,
-            inner_packet_id: 0x10,
-            body: conn_accept,
-        };
+        self.client_frameset_index = frameset.index;
+        let mut frames_tosend: Vec<Frame> = vec![];
+        
+        // = self.frames_queue
+        //    .lock()
+        //    .unwrap();
 
-        self.frames_queue
-            .lock()
-            .unwrap()
-            .push(respframe)
+        for frame in frameset.frames {
+            let packet = Packet {
+                packet_id: frame.inner_packet_id,
+                timestamp: packet.timestamp,
+                body: frame.body,
+            };
+
+            let mut reply = match frame.inner_packet_id {
+                0x09 => self.recv_frame_connection_request(packet).await,
+                _ => panic!("oh no"),
+            };
+
+            frames_tosend.push(
+                Frame {
+                    flags: frame.flags,
+                    bitlength: (reply.len() * 8) as u16,
+                    bodysize: reply.len() as u16,
+                    reliability: frame.reliability,
+                    fragment_info: frame.fragment_info,
+                    inner_packet_id: 0x10,
+                    body: reply,
+                }
+            );
+        }
+
+        self.frames_queue.lock().unwrap().append(&mut frames_tosend);
     }
 
-    pub fn create_nack(&mut self, first: u32, until: u32) -> MsgBuffer {
-        let records: Vec<u32> = (first..until).collect();
+    pub async fn recv_frame_connection_request(&mut self, mut packet: Packet) -> MsgBuffer {
+        let request = OnlineConnReq::from_buffer(&mut packet.body);
+
+        OnlineConnAccepted {
+            client_address: self.sockaddr,
+            timestamp: request.timestamp,
+        }.to_buffer()
+    }
+
+    pub fn send_nack(&mut self, first: u32, until: u32) {
+        let mut records: Vec<u32> = (first..until).collect();
 
         self.missing_records
             .lock()
             .unwrap()
-            .retain(|val| records.contains(val));
+            .append(&mut records);
 
-        Nack { records }.to_buffer()
+        let buf = Nack { records }.to_buffer();
+        self.send_queue.push(
+            Packet {
+                packet_id: 0xa0,
+                timestamp: get_unix_milis(),
+                body: buf
+            }
+        );
     }
 
-    pub fn create_ack(&mut self, first: u32, until: u32) -> MsgBuffer {
+    pub fn send_ack(&mut self, first: u32, until: u32) {
         let records: Vec<u32> = (first..until).collect();
 
         for rec in &records {
             self.missing_records.lock().unwrap().push(*rec);
         }
 
-        Ack { records }.to_buffer()
+        let buf = Ack { records }.to_buffer();
+        self.send_queue.push(
+            Packet {
+                packet_id: 0xc0,
+                timestamp: get_unix_milis(),
+                body: buf
+            }
+        );
     }
 
-    pub async fn recv_frame_set(&mut self, frame_set: FrameSet) -> Vec<MsgBuffer> {
-        let mut packets_to_send: Vec<MsgBuffer> = vec![];
+    // pub fn create_frame(&mut self, old_frame: Frame, packet: Packet) {
 
-        // First check for missing frames and sending Nacks
-        if frame_set.index > self.client_frame_set_index + 1 {
-            packets_to_send
-                .push(self.create_nack(self.client_frame_set_index + 1, frame_set.index));
-        }
-
-        // As well as an Ack
-        packets_to_send.push(self.create_ack(frame_set.index, frame_set.index + 1));
-
-        self.client_frame_set_index = frame_set.index;
-
-        for frame in frame_set.frames {
-            // self.call_online_event(frame).await;
-        }
-
-        // package everything currently
-
-        let mut frames_queue = self.frames_queue.lock().unwrap();
-        self.server_frame_set_index += 1;
-
-        let mut new_frame_set = FrameSet {index: self.server_frame_set_index, frames: vec![]};
-        for _ in 0..frames_queue.len() {
-            new_frame_set.frames.push(frames_queue.remove(0));
-        }
-
-        // TODO: wtf is this:
-        // [132, 0, 0, 0, 64, 2, 248, 0, 95, 0, 0, 0, 4, 127, 0, 0, 1, 235, 158, 0, 0, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 0, 0, 0, 2, 112, 138, 54, 252, 0, 0, 1, 139, 198, 176, 186, 127]
-
-        packets_to_send.push(new_frame_set.to_buffer());
-        packets_to_send
-    }
+    // }
 }

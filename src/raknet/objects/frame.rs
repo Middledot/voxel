@@ -8,6 +8,7 @@
 use super::FragmentInfo;
 use super::MsgBuffer;
 use super::Reliability;
+use crate::raknet::packets::{FromBuffer, ToBuffer};
 
 pub struct Frame {
     pub flags: u8,
@@ -20,13 +21,45 @@ pub struct Frame {
 }
 
 impl Frame {
-    pub fn parse(buf: &mut MsgBuffer) -> Self {
+    pub fn totalsize(&self) -> u16 {
+        // 1 (flags)
+        // 2 (bit length of body)
+        // 3 (rel frame index) (if reliable)
+        // 3 (seq frame index) (if sequenced)
+        // 3 + 1 (ordered index + channel) (if ordered)
+        // 4 + 2 + 4 (if fragmented)
+        // + actual size of body (bytes)
+        let mut size: u16 = 3;
+
+        if self.reliability.is_reliable() {
+            size += 3;
+        }
+
+        if self.reliability.is_sequenced() {
+            size += 3;
+        }
+
+        if self.reliability.is_ordered() {
+            size += 4;
+        }
+
+        if self.fragment_info.is_fragmented {
+            size += 10;
+        }
+
+        size += self.bodysize;
+
+        size
+    }
+}
+
+impl FromBuffer for Frame {
+    fn from_buffer(buf: &mut MsgBuffer) -> Self {
         // so far, pretty much completely taken from PieMC
         let flags = buf.read_byte();
         let bitlength = buf.read_u16_be_bytes();
 
-        let mut reliability = Reliability::new(flags);
-        reliability.extract(buf);
+        let reliability = Reliability::extract(flags, buf);
 
         let mut fragment_info = FragmentInfo::new(flags);
         fragment_info.extract(buf);
@@ -59,8 +92,10 @@ impl Frame {
             body,
         }
     }
+}
 
-    pub fn serialize(&mut self) -> MsgBuffer {
+impl ToBuffer for Frame {
+    fn to_buffer(&self) -> MsgBuffer {
         let mut buf = MsgBuffer::new();
         buf.write_byte(self.flags);
         buf.write_u16_be_bytes(&self.bitlength);
@@ -82,7 +117,7 @@ impl Frame {
             buf.write_i32_be_bytes(&self.fragment_info.index.unwrap());
         }
 
-        buf.write_buffer(&mut self.body);
+        buf.write_buffer(self.body.get_bytes());
 
         buf
     }

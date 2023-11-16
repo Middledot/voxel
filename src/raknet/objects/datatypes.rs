@@ -7,6 +7,7 @@
 ///
 /// TODO: cleanup and trimming (do we need all of these?)
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 pub fn from_i64_be_bytes(bytes: [u8; 8]) -> i64 {
     i64::from_be_bytes(bytes)
@@ -102,6 +103,14 @@ pub fn to_address_bytes(addr: &SocketAddr) -> Vec<u8> {
     }
 
     address
+}
+
+pub fn get_unix_milis() -> u128 {
+    let start = SystemTime::now();
+    let since_the_epoch = start
+        .duration_since(UNIX_EPOCH)
+        .expect("Uhm... excuse me");
+    since_the_epoch.as_millis()
 }
 
 // read_string

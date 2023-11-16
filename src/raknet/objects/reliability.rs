@@ -35,10 +35,52 @@ impl ReliabilityType {
             _ => panic!("Uhm, excuse me"),
         }
     }
+
+    pub fn is_unreliable(&self) -> bool {
+        if let ReliabilityType::Unreliable | ReliabilityType::UnreliableSequenced = self
+        {
+            return true;
+        }
+        false
+    }
+
+    pub fn is_reliable(&self) -> bool {
+        if let ReliabilityType::Reliable
+        | ReliabilityType::ReliableSequenced
+        | ReliabilityType::ReliableOrdered
+        | ReliabilityType::ReliableACK
+        | ReliabilityType::ReliableOrderedACK = self
+        {
+            return true;
+        }
+        false
+    }
+
+    pub fn is_sequenced(&self) -> bool {
+        if self.is_ordered() {
+            return true;
+        }
+        if let ReliabilityType::UnreliableSequenced | ReliabilityType::ReliableSequenced =
+            self
+        {
+            return true;
+        }
+        false
+    }
+
+    pub fn is_ordered(&self) -> bool {
+        // sequenced implies ordered
+        if let ReliabilityType::ReliableOrdered | ReliabilityType::ReliableOrderedACK =
+            self
+        {
+            return true;
+        }
+        false
+    }
 }
 
 pub struct Reliability {
-    _type: ReliabilityType,
+    reltype: ReliabilityType,
     pub rel_frameindex: Option<u32>,
     pub seq_frameindex: Option<u32>,
     pub ord_frameindex: Option<u32>,
@@ -47,104 +89,50 @@ pub struct Reliability {
 
 impl Reliability {
     // resource: http://www.jenkinssoftware.com/raknet/manual/reliabilitytypes.html
-    pub fn new(flags: u8) -> Self {
+    pub fn extract(flags: u8, buf: &mut MsgBuffer) -> Self {
+        let reltype = ReliabilityType::from_flags(flags);
+
+        let mut rel_frameindex = None;
+        let mut seq_frameindex = None;
+        let mut ord_frameindex = None;
+        let mut ord_channel = None;
+
+        if reltype.is_reliable() {
+            rel_frameindex = Some(buf.read_u24_le_bytes());
+        }
+
+        if reltype.is_sequenced() {
+            seq_frameindex = Some(buf.read_u24_le_bytes());
+        }
+
+        if reltype.is_ordered() {
+            ord_frameindex = Some(buf.read_u24_le_bytes());
+            ord_channel = Some(buf.read_byte());
+        }
+
         Self {
-            _type: ReliabilityType::from_flags(flags),
-            rel_frameindex: None,
-            seq_frameindex: None,
-            ord_frameindex: None,
-            ord_channel: None,
+            reltype: ReliabilityType::from_flags(flags),
+            rel_frameindex,
+            seq_frameindex,
+            ord_frameindex,
+            ord_channel,
         }
     }
 
-    pub fn extract(&mut self, buf: &mut MsgBuffer) {
-        if self.is_reliable() {
-            self.rel_frameindex = Some(buf.read_u24_le_bytes());
-        }
-
-        if self.is_sequenced() {
-            self.seq_frameindex = Some(buf.read_u24_le_bytes());
-        }
-
-        if self.is_ordered() {
-            self.ord_frameindex = Some(buf.read_u24_le_bytes());
-            self.ord_channel = Some(buf.read_byte());
-        }
+    pub fn is_unreliable(&self) -> bool {
+        self.reltype.is_unreliable()
     }
 
-    // actually we could just use .unwrap() and hope for the best
-
-    // pub fn get_rel_frameindex(&mut self) -> u32 {
-    //     match self.rel_frameindex {
-    //         Some(rel_frameindex) => rel_frameindex,
-    //         None => panic!("Not sure what to do here")
-    //     }
-    // }
-
-    // pub fn get_seq_frameindex(&mut self) -> u32 {
-    //     match self.seq_frameindex {
-    //         Some(seq_frameindex) => seq_frameindex,
-    //         None => panic!("Not sure what to do here")
-    //     }
-    // }
-
-    // pub fn get_ord_frameindex(&mut self) -> u32 {
-    //     match self.ord_frameindex {
-    //         Some(ord_frameindex) => ord_frameindex,
-    //         None => panic!("Not sure what to do here")
-    //     }
-    // }
-
-    // pub fn get_ord_channnel(&mut self) -> u8 {
-    //     match self.ord_channel {
-    //         Some(ord_channel) => ord_channel,
-    //         None => panic!("Not sure what to do here")
-    //     }
-    // }
-
-    pub fn get_type(&mut self) -> &ReliabilityType {
-        &self._type
+    pub fn is_reliable(&self) -> bool {
+        self.reltype.is_reliable()
     }
 
-    pub fn is_unreliable(&mut self) -> bool {
-        if let ReliabilityType::Unreliable | ReliabilityType::UnreliableSequenced = self.get_type()
-        {
-            return true;
-        }
-        false
+    pub fn is_sequenced(&self) -> bool {
+        self.reltype.is_sequenced()
     }
 
-    pub fn is_reliable(&mut self) -> bool {
-        if let ReliabilityType::Reliable
-        | ReliabilityType::ReliableSequenced
-        | ReliabilityType::ReliableOrdered
-        | ReliabilityType::ReliableACK
-        | ReliabilityType::ReliableOrderedACK = self.get_type()
-        {
-            return true;
-        }
-        false
-    }
-
-    pub fn is_sequenced(&mut self) -> bool {
-        if let ReliabilityType::UnreliableSequenced | ReliabilityType::ReliableSequenced =
-            self.get_type()
-        {
-            return true;
-        }
-        false
-    }
-
-    pub fn is_ordered(&mut self) -> bool {
+    pub fn is_ordered(&self) -> bool {
         // sequenced implies ordered
-        if self.is_sequenced() {
-            return true;
-        }
-        if let ReliabilityType::ReliableOrdered | ReliabilityType::ReliableOrderedACK =
-            self.get_type()
-        {
-            return true;
-        }
-        false
+        self.reltype.is_ordered()
     }
 }

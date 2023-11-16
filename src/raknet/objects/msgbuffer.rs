@@ -8,6 +8,13 @@ use std::net::SocketAddr;
 
 use super::datatypes::*;
 
+pub struct Packet {
+    pub packet_id: u8,
+    pub timestamp: u128,
+    pub body: MsgBuffer,
+}
+
+
 pub struct MsgBuffer {
     buffer: Vec<u8>,
     pos: usize,

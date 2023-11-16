@@ -6,34 +6,72 @@
 /// Reference: https://wiki.vg/Raknet_Protocol
 use rand::Rng;
 use std::collections::HashMap;
-use std::net::{IpAddr, SocketAddr};
+use std::net::SocketAddr;
+use std::io::Error;
+use std::{thread, time::{SystemTime, UNIX_EPOCH}};
 use tokio::net::UdpSocket;
 
 use log::trace;
 
+use super::objects::msgbuffer::Packet;
 use super::objects::{Frame, MsgBuffer};
 use super::packets::*;
 use super::session::{FrameSet, Session};
 use crate::config::Config;
 
+
+struct Socket {
+    udpsock: UdpSocket,
+}
+
+impl Socket {
+    pub async fn bind(addr: String) -> Self {
+        Self {
+            udpsock: UdpSocket::bind(addr).await.unwrap()  // might fail lol
+        }
+    }
+
+    pub async fn send_packet(&self, packet_id: u8, packet: &mut MsgBuffer, client: SocketAddr) {
+        let serialized = packet;
+        let body = serialized.get_bytes();
+        let mut bytes = vec![packet_id];
+        bytes.extend_from_slice(body);
+
+        self.send_to(&bytes, client).await;
+
+        if !packet_id == 0x1c {
+            trace!("0x{packet_id} SENT = {body:?}");
+        }
+    }
+
+    pub async fn send_to(&self, buf: &[u8], target: SocketAddr) {
+        self.udpsock.send_to(buf, target).await.expect(format!("Failed to send packet to {}", target.to_string()).as_str());
+    }
+
+    pub async fn recv_from(&self, buf: &mut [u8]) -> Result<(usize, SocketAddr), Error> {
+        self.udpsock.recv_from(buf).await
+    }
+}
+
+
 pub struct RakNetServer {
-    socket: UdpSocket,
+    socket: Socket,
     server_guid: i64,
     config: Config,
-    sessions: HashMap<(IpAddr, u16), Session>,
+    sessions: HashMap<String, Session>,
+    buf: [u8; 2048],
 }
 
 impl RakNetServer {
     pub async fn new(config: Config) -> Self {
-        let socket = UdpSocket::bind("127.0.0.1:".to_string() + config.get_property("server-port"))
-            .await
-            .expect("Failed to bind to port");
+        let socket = Socket::bind("127.0.0.1:".to_string() + config.get_property("server-port")).await;
 
         Self {
             socket,
             server_guid: rand::thread_rng().gen_range(1..=i64::MAX),
             config,
             sessions: HashMap::new(),
+            buf: [0u8; 2048]
         }
     }
 
@@ -58,88 +96,19 @@ impl RakNetServer {
         .join(";")
     }
 
-    pub async fn send_packet<T>(&mut self, packet_id: u8, packet: &T, client: SocketAddr)
-    where
-        T: ToBuffer,
-    {
-        let mut serialized = packet.to_buffer();
-        let body = serialized.get_bytes();
-        let mut bytes = vec![packet_id];
-        bytes.extend_from_slice(body);
-
-        self.socket
-            .send_to(&bytes, client)
-            .await
-            .expect("Sending packet failed");
-
-        if !packet_id == 0x1c {
-            trace!("0x{packet_id} SENT = {body:?}");
-        }
-    }
-
-    pub async fn unconnected_ping(
-        &mut self,
-        _packet_id: u8,
-        mut bufin: MsgBuffer,
-        client: SocketAddr,
-    ) {
-        let offline_ping = OfflinePing::from_buffer(&mut bufin);
-
-        let offline_pong = OfflinePong {
-            timestamp: offline_ping.timestamp,
-            server_guid: self.server_guid,
-            magic: offline_ping.magic,
-            server_name: self.get_server_name(),
-        };
-
-        self.send_packet(0x1c, &offline_pong, client).await;
-    }
-
-    pub async fn offline_connection_request_1(
-        &mut self,
-        _packet_id: u8,
-        mut bufin: MsgBuffer,
-        client: SocketAddr,
-    ) {
-        let offline_conn_req_1 = OfflineConnReq1::from_buffer(&mut bufin);
-
-        let offline_conn_rep_1 = OfflineConnRep1 {
-            magic: offline_conn_req_1.magic,
-            server_guid: self.server_guid,
-            use_security: false,
-            mtu: offline_conn_req_1.mtu,
-        };
-
-        self.send_packet(0x06, &offline_conn_rep_1, client).await;
-    }
-
-    pub async fn offline_connection_request_2(
-        &mut self,
-        _packet_id: u8,
-        mut bufin: MsgBuffer,
-        client: SocketAddr,
-    ) {
-        let offline_conn_req_2 = OfflineConnReq2::from_buffer(&mut bufin);
-
-        let offline_conn_rep_2 = OfflineConnRep2 {
-            magic: offline_conn_req_2.magic,
-            server_guid: self.server_guid,
-            client_address: client,
-            mtu: offline_conn_req_2.mtu,
-            use_encryption: false, // disable encryption // TODO: look into? what is this?
-        };
-
-        self.send_packet(0x08, &offline_conn_rep_2, client).await;
-
-        let user = Session::new(
-            client,
-            offline_conn_req_2.client_guid,
-            offline_conn_req_2.mtu,
+    pub fn create_session(&mut self, mtu: i16, addr: SocketAddr) {
+        self.sessions.insert(
+            addr.to_string(),
+            Session::new(
+                addr, 
+                0,
+                self.server_guid,
+                mtu
+            )
         );
-
-        self.sessions
-            .insert((user.sockaddr.ip(), user.sockaddr.port()), user);
     }
+
+    // pub async fn send
 
     pub async fn recv_frame_set(
         &mut self,
@@ -165,80 +134,97 @@ impl RakNetServer {
 
         let sess = self
             .sessions
-            .get_mut(&(client.ip(), client.port()))
+            .get_mut(&client.to_string())
             .unwrap();
 
         let packets_to_send = sess.recv_frame_set(frame_set).await;
 
         for mut packet in packets_to_send {
-            self.socket
-                .send_to(packet.get_bytes(), client)
-                .await
-                .expect("damn");
+            self.socket.send_to(packet.get_bytes(), client).await;
             let bytes = packet.get_bytes();
             trace!("SENT = {bytes:?}");
         }
     }
 
-    pub async fn call_offline_event(
-        &mut self,
-        packet_id: u8,
-        bufin: MsgBuffer,
-        client: SocketAddr,
-    ) {
-        match packet_id {
-            0x01 | 0x02 => self.unconnected_ping(packet_id, bufin, client).await,
-            0x05 => {
-                self.offline_connection_request_1(packet_id, bufin, client)
-                    .await
-            }
-            0x07 => {
-                self.offline_connection_request_2(packet_id, bufin, client)
-                    .await
-            }
-            0x80..=0x8d => self.recv_frame_set(packet_id, bufin, client).await,
-            _ => panic!("There's nothing we can do | Nous pouvons rien faire"),
-        };
+    pub fn get_unix_milis(&self) -> u128 {
+        let start = SystemTime::now();
+        let since_the_epoch = start
+            .duration_since(UNIX_EPOCH)
+            .expect("Uhm... excuse me");
+        since_the_epoch.as_millis()
     }
 
-    pub async fn call_online_event(
-        &mut self,
-        packet_id: u8,
-        mut bufin: MsgBuffer,
-        client: SocketAddr,
-    ) {
-        let sess = self
-            .sessions
-            .get_mut(&(client.ip(), client.port()))
-            .unwrap();
+    pub async fn read_message(&mut self) -> Option<(Packet, SocketAddr)> {
+        let (size, client) = match self.socket.recv_from(&mut self.buf).await {
+            Ok((packetsize, client)) => (packetsize, client),
+            Err(_e) => return None, // panic!("recv function failed: {e:?}"),
+        };
+
+        let packet_id = self.buf[0];
+        let mut body = MsgBuffer::from(self.buf[1..size].to_vec());
+
         match packet_id {
-            0xc0 => sess.recv_ack(Ack::from_buffer(&mut bufin)),
-            0x80..=0x8d => self.recv_frame_set(packet_id, bufin, client).await,
-            _ => panic!("There's nothing we can do | Nous pouvons rien faire"),
+            0x01 | 0x02 => {
+                let offping = OfflinePing::from_buffer(&mut body);
+
+                let offpong = OfflinePong {
+                    timestamp: offping.timestamp,
+                    server_guid: self.server_guid,
+                    magic: offping.magic,
+                    server_name: self.get_server_name(),
+                };
+        
+                self.socket.send_packet(0x1c, &mut offpong.to_buffer(), client).await;
+                return None;
+            },
+            0x05 => {
+                trace!("0x{packet_id} RECV = {:?}", body.get_bytes());
+
+                let request1 = OfflineConnReq1::from_buffer(&mut body);
+
+                self.create_session(request1.mtu, client);
+
+                let reply1 = OfflineConnRep1 {
+                    magic: request1.magic,
+                    server_guid: self.server_guid,
+                    use_security: false,
+                    mtu: request1.mtu,
+                };
+        
+                self.socket.send_packet(0x06, &mut reply1.to_buffer(), client).await;
+                return None;
+            }
+            _ => {}
         }
+
+        trace!("0x{packet_id} RECV = {:?}", body.get_bytes());  // rename to body
+
+        Some((Packet {packet_id, timestamp: self.get_unix_milis(), body}, client))
     }
 
     pub async fn mainloop(&mut self) {
-        let mut buf = [0u8; 2048]; // 2kb
-
         loop {
-            let (packetsize, client) = match self.socket.recv_from(&mut buf).await {
-                Ok((packetsize, client)) => (packetsize, client),
-                Err(_e) => continue, // panic!("recv function failed: {e:?}"),
-            };
-            let packet_id = buf[0];
-            let body = &buf[1..packetsize];
-            if !(buf[0] == 0x01 || buf[0] == 0x02) {
-                trace!("0x{packet_id} RECV = {body:?}");
-            }
-            let bufin = MsgBuffer::from(body.to_vec());
+            let last_update_time = self.get_unix_milis();
 
-            match packet_id {
-                0x01 | 0x02 | 0x05 | 0x07 => {
-                    self.call_offline_event(packet_id, bufin, client).await
+            while self.get_unix_milis() - last_update_time < 50 {
+                let (packet, client) = match self.read_message().await {
+                    Some((packet, client)) => (packet, client),
+                    None => continue,
+                };
+
+                let sess = self.sessions.get_mut(&client.to_string()).unwrap();
+                sess.recv(packet);
+            }
+
+            for (_, sess) in self.sessions.iter_mut() {
+                sess.update().await;
+            }
+
+            for (_, sess) in self.sessions.iter_mut() {
+                let mut packets = std::mem::replace(&mut sess.send_queue, vec![]);
+                for packet in packets.iter_mut() {
+                    self.socket.send_packet(packet.packet_id, &mut packet.body, sess.sockaddr).await;
                 }
-                0xc0 | 0xa0 | 0x80..=0x8d => self.call_online_event(packet_id, bufin, client).await,
-                _ => panic!("There's nothing we can do | Nous pouvons rien faire"),
             }
         }
     }

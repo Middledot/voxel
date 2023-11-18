@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 
-use super::objects::Frame;
 use super::objects::MsgBuffer;
 use super::objects::msgbuffer::Packet;
 use super::objects::datatypes::get_unix_milis;
@@ -10,51 +9,6 @@ use super::packets::{Ack, Nack, OnlineConnAccepted, OnlineConnReq};
 use super::packets::{FromBuffer, ToBuffer};
 use super::packets::*;
 
-pub struct FrameSet {
-    pub index: u32,
-    pub frames: Vec<Frame>,
-}
-
-impl FrameSet {
-    pub fn currentsize(&self) -> u16 {
-        self.frames.iter().map(|f| f.totalsize()).sum::<u16>() + 4
-    }
-
-    pub fn add_frame(&mut self, frame: Frame) {
-        self.frames.push(frame);
-    }
-}
-
-impl FromBuffer for FrameSet {
-    fn from_buffer(buf: &mut MsgBuffer) -> Self {
-        let index = buf.read_u24_le_bytes();
-        let mut frames: Vec<Frame> = vec![];
-
-        while !buf.at_end() {
-            frames.push(
-                Frame::from_buffer(buf)
-            )
-        }
-
-        Self {
-            index,
-            frames,
-        }
-    }
-}
-
-impl ToBuffer for FrameSet {
-    fn to_buffer(&self) -> MsgBuffer {
-        let mut buf = MsgBuffer::new();
-        buf.write_u24_le_bytes(&self.index);
-
-        for fr in self.frames.iter() {
-            buf.write_buffer(fr.to_buffer().get_bytes());
-        }
-
-        buf
-    }
-}
 
 pub struct Session {
     pub sockaddr: SocketAddr,

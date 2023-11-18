@@ -1,14 +1,7 @@
-/// raknet/objects/frame.rs
-/// =======================
-///
-/// Class that contains information of a frame, which is sent
-/// in multiples with frame_set (packet ids 0x80 to 0x8d).
-///
-/// Reference: https://wiki.vg/Raknet_Protocol#Frame_Set_Packet
-use super::FragmentInfo;
-use super::MsgBuffer;
-use super::Reliability;
-use crate::raknet::packets::{FromBuffer, ToBuffer};
+use crate::raknet::objects::FragmentInfo;
+use crate::raknet::objects::MsgBuffer;
+use crate::raknet::objects::Reliability;
+use super::{FromBuffer, ToBuffer};
 
 pub struct Frame {
     pub flags: u8,
@@ -118,6 +111,52 @@ impl ToBuffer for Frame {
         }
 
         buf.write_buffer(self.body.get_bytes());
+
+        buf
+    }
+}
+
+pub struct FrameSet {
+    pub index: u32,
+    pub frames: Vec<Frame>,
+}
+
+impl FrameSet {
+    pub fn currentsize(&self) -> u16 {
+        self.frames.iter().map(|f| f.totalsize()).sum::<u16>() + 4
+    }
+
+    pub fn add_frame(&mut self, frame: Frame) {
+        self.frames.push(frame);
+    }
+}
+
+impl FromBuffer for FrameSet {
+    fn from_buffer(buf: &mut MsgBuffer) -> Self {
+        let index = buf.read_u24_le_bytes();
+        let mut frames: Vec<Frame> = vec![];
+
+        while !buf.at_end() {
+            frames.push(
+                Frame::from_buffer(buf)
+            )
+        }
+
+        Self {
+            index,
+            frames,
+        }
+    }
+}
+
+impl ToBuffer for FrameSet {
+    fn to_buffer(&self) -> MsgBuffer {
+        let mut buf = MsgBuffer::new();
+        buf.write_u24_le_bytes(&self.index);
+
+        for fr in self.frames.iter() {
+            buf.write_buffer(fr.to_buffer().get_bytes());
+        }
 
         buf
     }

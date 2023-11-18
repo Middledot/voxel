@@ -8,6 +8,7 @@ use std::net::SocketAddr;
 
 use super::datatypes::*;
 
+#[derive(Debug)]
 pub struct Packet {
     pub packet_id: u8,
     // TODO: if this eventually has a use, change all the time I just

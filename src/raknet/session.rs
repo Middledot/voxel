@@ -133,7 +133,6 @@ impl Session {
 
     pub async fn call_event(&mut self, packet: Packet) {
         match packet.packet_id {
-            0x07 => self.recv_offline_connection_request_2(packet).await,
             0xa0 => self.recv_nack(packet).await,
             0xc0 => self.recv_ack(packet).await,
             0x80..=0x8d => self.recv_frame_set(packet).await,
@@ -159,29 +158,8 @@ impl Session {
             let packet = Packet {packet_id: 0x84, timestamp: packet.timestamp, body: frame_set.to_buffer()};
 
             self.send_queue.push(packet);
+
         }
-    }
-
-    pub async fn recv_offline_connection_request_2(&mut self, mut packet: Packet) {
-        let request2 = OfflineConnReq2::from_buffer(&mut packet.body);
-
-        let reply2 = OfflineConnRep2 {
-            magic: request2.magic,
-            server_guid: self.server_guid,
-            client_address: self.sockaddr,
-            mtu: self.mtu as i16,
-            use_encryption: false, // disable encryption // TODO: look into? what is this?
-        };
-
-        self.guid = request2.client_guid;
-
-        self.send_queue.push(
-            Packet {
-                packet_id: 0x08,
-                timestamp: packet.timestamp,
-                body: reply2.to_buffer()
-            }
-        );
     }
 
     pub async fn recv_frame_set(&mut self, mut packet: Packet) {
@@ -198,10 +176,6 @@ impl Session {
 
         self.client_frameset_index = frameset.index;
         let mut frames_tosend: Vec<Frame> = vec![];
-        
-        // = self.frames_queue
-        //    .lock()
-        //    .unwrap();
 
         for frame in frameset.frames {
             let packet = Packet {

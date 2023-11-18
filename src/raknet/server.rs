@@ -65,14 +65,16 @@ impl RakNetServer {
     }
 
     pub fn create_session(&mut self, mtu: i16, addr: SocketAddr) {
+        let sess = Session::new(
+            addr, 
+            0,
+            self.server_guid,
+            mtu
+        );
+
         self.sessions.insert(
             addr.to_string(),
-            Session::new(
-                addr, 
-                0,
-                self.server_guid,
-                mtu
-            )
+            sess
         );
     }
 
@@ -112,8 +114,28 @@ impl RakNetServer {
                     use_security: false,
                     mtu: request1.mtu,
                 };
-        
+
                 self.socket.send_packet(0x06, &mut reply1.to_buffer(), client).await;
+                return None;
+            },
+            0x07 => {
+                trace!("0x{packet_id} RECV = {:?}", body.get_bytes());
+
+                let sess = self.sessions.get_mut(&client.to_string()).unwrap();
+
+                let request2 = OfflineConnReq2::from_buffer(&mut body);
+
+                let reply2 = OfflineConnRep2 {
+                    magic: request2.magic,
+                    server_guid: sess.server_guid,
+                    client_address: sess.sockaddr,
+                    mtu: sess.mtu as i16,
+                    use_encryption: false, // disable encryption // TODO: look into? what is this?
+                };
+
+                sess.guid = request2.client_guid;
+
+                self.socket.send_packet(0x08, &mut reply2.to_buffer(), client).await;
                 return None;
             }
             _ => {}

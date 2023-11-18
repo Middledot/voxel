@@ -79,7 +79,7 @@ impl RakNetServer {
     }
 
     pub async fn read_message(&mut self) -> Option<(Packet, SocketAddr)> {
-        let (size, client) = match self.socket.recv_from(&mut self.buf).await {
+        let (size, client) = match self.socket.try_recv_from(&mut self.buf) {
             Ok((packetsize, client)) => (packetsize, client),
             Err(_e) => return None, // panic!("recv function failed: {e:?}"),
         };

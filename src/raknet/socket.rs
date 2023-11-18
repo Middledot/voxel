@@ -25,7 +25,6 @@ impl Socket {
 
         self.send_to(&bytes, client).await;
 
-        println!("ok {}", packet_id);
         if !(packet_id == 0x1c) {
             trace!("0x{packet_id} SENT = {body:?}");
         }
@@ -35,11 +34,7 @@ impl Socket {
         self.udpsock.send_to(buf, target).await.expect(format!("Failed to send packet to {}", target.to_string()).as_str());
     }
 
-    // pub async fn poll_recv_from(&self, buf: &mut [u8]) {
-    //     self.udpsock.poll_recv_from()
-    // }
-
-    pub async fn recv_from(&self, buf: &mut [u8]) -> Result<(usize, SocketAddr), Error> {
-        self.udpsock.recv_from(buf).await
+    pub fn try_recv_from(&self, buf: &mut [u8]) -> Result<(usize, SocketAddr), Error> {
+        self.udpsock.try_recv_from(buf)
     }
 }

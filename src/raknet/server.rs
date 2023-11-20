@@ -7,7 +7,7 @@
 use rand::Rng;
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::thread;
+
 
 use log::trace;
 
@@ -45,8 +45,7 @@ impl RakNetServer {
         let motd = self.config.get_property("server-name");
 
         // so picky I don't get it smh
-        vec![
-            "MCPE",
+        ["MCPE",
             motd,
             "622",
             "1.20.40",
@@ -57,8 +56,7 @@ impl RakNetServer {
             "Creative",
             "1",
             self.config.get_property("server-port").as_str(),
-            self.config.get_property("server-portv6").as_str(),
-        ]
+            self.config.get_property("server-portv6").as_str()]
         .join(";")
     }
 
@@ -123,7 +121,7 @@ impl RakNetServer {
                     magic: request2.magic,
                     server_guid: sess.server_guid,
                     client_address: sess.sockaddr,
-                    mtu: sess.mtu as i16,
+                    mtu: sess.mtu,
                     use_encryption: false, // disable encryption // TODO: look into? what is this?
                 };
 
@@ -168,7 +166,7 @@ impl RakNetServer {
             }
 
             for (_, sess) in self.sessions.iter_mut() {
-                let mut packets = std::mem::replace(&mut sess.send_queue, vec![]);
+                let mut packets = std::mem::take(&mut sess.send_queue);
                 for packet in packets.iter_mut() {
                     self.socket
                         .send_packet(packet.packet_id, &mut packet.body, sess.sockaddr)

@@ -3,13 +3,13 @@ use crate::raknet::objects::MsgBuffer;
 
 // TODO: acknack can have many bodies of records
 
-fn write_body(input_records: &Vec<u32>, id: u8) -> MsgBuffer {
+fn write_body(input_records: &[u32], id: u8) -> MsgBuffer {
     // TODO: for some reason it sends this:
     // [192, 0, 1, 1, 0, 0, 0, 0, 0, 0]
     let mut acknack = MsgBuffer::new();
     acknack.write_byte(id);
 
-    let mut records = input_records.clone();
+    let mut records = input_records.to_owned();
     records.sort();
 
     let mut section: Vec<u32> = vec![];

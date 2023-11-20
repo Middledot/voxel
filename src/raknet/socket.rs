@@ -23,7 +23,7 @@ impl Socket {
 
         self.send_to(&bytes, client).await;
 
-        if !(packet_id == 0x1c) {
+        if packet_id != 0x1c {
             trace!("0x{packet_id} SENT = {body:?}");
         }
     }
@@ -32,7 +32,7 @@ impl Socket {
         self.udpsock
             .send_to(buf, target)
             .await
-            .expect(format!("Failed to send packet to {}", target.to_string()).as_str());
+            .unwrap_or_else(|_| panic!("Failed to send packet to {}", target));
     }
 
     pub fn try_recv_from(&self, buf: &mut [u8]) -> Result<(usize, SocketAddr), Error> {

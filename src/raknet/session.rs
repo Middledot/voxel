@@ -45,7 +45,7 @@ impl Session {
     }
 
     pub async fn update(&mut self) -> Vec<Packet> {
-        let packets = std::mem::replace(&mut self.recv_queue, vec![]);
+        let packets = std::mem::take(&mut self.recv_queue);
         for packet in packets {
             self.call_event(packet).await;
         }
@@ -82,7 +82,7 @@ impl Session {
             frameset.add_frame(frame);
         }
 
-        std::mem::replace(&mut self.send_queue, vec![])
+        std::mem::take(&mut self.send_queue)
     }
 
     pub async fn call_event(&mut self, packet: Packet) {

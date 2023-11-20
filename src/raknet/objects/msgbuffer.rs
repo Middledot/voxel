@@ -173,7 +173,7 @@ impl MsgBuffer {
         self.write(&to_address_bytes(address));
     }
 
-    pub fn write_buffer(&mut self, other: &Vec<u8>) {
+    pub fn write_buffer(&mut self, other: &[u8]) {
         self.buffer.extend_from_slice(other)
     }
 }

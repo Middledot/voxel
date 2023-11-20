@@ -14,8 +14,10 @@ pub struct Session {
     pub guid: i64,
     pub server_guid: i64,
     pub mtu: i16,
-    server_frameset_index: u32,
-    client_frameset_index: u32,
+    fs_server_index: u32,  // imma use abbr here cuz 
+    fs_client_index: u32,
+    rel_client_index: u32,
+    rel_server_index: u32,
     pub recv_queue: Vec<Packet>,
     pub send_queue: Vec<Packet>,
     frames_queue: Arc<Mutex<Vec<Frame>>>,
@@ -30,8 +32,10 @@ impl Session {
             guid,
             server_guid,
             mtu,
-            server_frameset_index: 0,
-            client_frameset_index: 0,
+            fs_server_index: 0,
+            fs_client_index: 0,
+            rel_client_index: 0,
+            rel_server_index: 0,
             recv_queue: vec![],
             send_queue: vec![],
             frames_queue: Arc::new(Mutex::new(vec![])),
@@ -50,10 +54,10 @@ impl Session {
             self.call_event(packet).await;
         }
 
-        self.server_frameset_index += 1;
+        self.fs_server_index += 1;
 
         let mut frameset = FrameSet {
-            index: self.server_frameset_index,
+            index: self.fs_server_index,
             frames: vec![],
         };
 
@@ -72,9 +76,9 @@ impl Session {
                     .unwrap()
                     .insert(frameset.index, frameset);
 
-                self.server_frameset_index += 1;
+                self.fs_server_index += 1;
                 frameset = FrameSet {
-                    index: self.server_frameset_index,
+                    index: self.fs_server_index,
                     frames: vec![],
                 };
             }
@@ -129,13 +133,13 @@ impl Session {
 
         let frameset = FrameSet::from_buffer(&mut packet.body);
 
-        if frameset.index > self.client_frameset_index + 1 {
-            self.send_nack(self.client_frameset_index + 1, frameset.index);
+        if frameset.index > self.fs_client_index + 1 {
+            self.send_nack(self.fs_client_index + 1, frameset.index);
         }
         self.send_ack(frameset.index, frameset.index + 1);
 
-        self.client_frameset_index = frameset.index;
-        let mut frames_tosend: Vec<Frame> = vec![];
+        self.fs_client_index = frameset.index;
+        let mut frames_to_send: Vec<Frame> = vec![];
 
         for frame in frameset.frames {
             let packet = Packet {
@@ -149,7 +153,7 @@ impl Session {
                 _ => panic!("oh no"),
             };
 
-            frames_tosend.push(Frame {
+            frames_to_send.push(Frame {
                 flags: frame.flags,
                 bitlength: (reply.len() * 8) as u16,
                 bodysize: reply.len() as u16,
@@ -160,7 +164,7 @@ impl Session {
             });
         }
 
-        self.frames_queue.lock().unwrap().append(&mut frames_tosend);
+        self.frames_queue.lock().unwrap().append(&mut frames_to_send);
     }
 
     pub async fn recv_frame_connection_request(&mut self, mut packet: Packet) -> MsgBuffer {

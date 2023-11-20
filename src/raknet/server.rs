@@ -8,7 +8,6 @@ use rand::Rng;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 
-
 use log::trace;
 
 use super::objects::datatypes::get_unix_milis;
@@ -45,7 +44,8 @@ impl RakNetServer {
         let motd = self.config.get_property("server-name");
 
         // so picky I don't get it smh
-        ["MCPE",
+        [
+            "MCPE",
             motd,
             "622",
             "1.20.40",
@@ -56,7 +56,8 @@ impl RakNetServer {
             "Creative",
             "1",
             self.config.get_property("server-port").as_str(),
-            self.config.get_property("server-portv6").as_str()]
+            self.config.get_property("server-portv6").as_str()
+        ]
         .join(";")
     }
 

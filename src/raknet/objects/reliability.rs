@@ -37,8 +37,7 @@ impl ReliabilityType {
     }
 
     pub fn is_unreliable(&self) -> bool {
-        if let ReliabilityType::Unreliable | ReliabilityType::UnreliableSequenced = self
-        {
+        if let ReliabilityType::Unreliable | ReliabilityType::UnreliableSequenced = self {
             return true;
         }
         false
@@ -60,9 +59,7 @@ impl ReliabilityType {
         if self.is_ordered() {
             return true;
         }
-        if let ReliabilityType::UnreliableSequenced | ReliabilityType::ReliableSequenced =
-            self
-        {
+        if let ReliabilityType::UnreliableSequenced | ReliabilityType::ReliableSequenced = self {
             return true;
         }
         false
@@ -70,9 +67,7 @@ impl ReliabilityType {
 
     pub fn is_ordered(&self) -> bool {
         // sequenced implies ordered
-        if let ReliabilityType::ReliableOrdered | ReliabilityType::ReliableOrderedACK =
-            self
-        {
+        if let ReliabilityType::ReliableOrdered | ReliabilityType::ReliableOrderedACK = self {
             return true;
         }
         false

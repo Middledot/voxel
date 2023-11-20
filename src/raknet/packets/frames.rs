@@ -1,7 +1,7 @@
+use super::{FromBuffer, ToBuffer};
 use crate::raknet::objects::FragmentInfo;
 use crate::raknet::objects::MsgBuffer;
 use crate::raknet::objects::Reliability;
-use super::{FromBuffer, ToBuffer};
 
 pub struct Frame {
     pub flags: u8,
@@ -137,15 +137,10 @@ impl FromBuffer for FrameSet {
         let mut frames: Vec<Frame> = vec![];
 
         while !buf.at_end() {
-            frames.push(
-                Frame::from_buffer(buf)
-            )
+            frames.push(Frame::from_buffer(buf))
         }
 
-        Self {
-            index,
-            frames,
-        }
+        Self { index, frames }
     }
 }
 

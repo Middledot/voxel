@@ -7,20 +7,17 @@
 use rand::Rng;
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::io::Error;
 use std::thread;
-use tokio::net::UdpSocket;
 
 use log::trace;
 
-use super::objects::msgbuffer::Packet;
 use super::objects::datatypes::get_unix_milis;
+use super::objects::msgbuffer::Packet;
 use super::objects::MsgBuffer;
 use super::packets::*;
 use super::session::Session;
-use crate::config::Config;
 use super::socket::Socket;
-
+use crate::config::Config;
 
 pub struct RakNetServer {
     socket: Socket,
@@ -32,14 +29,15 @@ pub struct RakNetServer {
 
 impl RakNetServer {
     pub async fn new(config: Config) -> Self {
-        let socket = Socket::bind("127.0.0.1:".to_string() + config.get_property("server-port")).await;
+        let socket =
+            Socket::bind("127.0.0.1:".to_string() + config.get_property("server-port")).await;
 
         Self {
             socket,
             server_guid: rand::thread_rng().gen_range(1..=i64::MAX),
             config,
             sessions: HashMap::new(),
-            buf: [0u8; 2048]
+            buf: [0u8; 2048],
         }
     }
 
@@ -65,17 +63,9 @@ impl RakNetServer {
     }
 
     pub fn create_session(&mut self, mtu: i16, addr: SocketAddr) {
-        let sess = Session::new(
-            addr, 
-            0,
-            self.server_guid,
-            mtu
-        );
+        let sess = Session::new(addr, 0, self.server_guid, mtu);
 
-        self.sessions.insert(
-            addr.to_string(),
-            sess
-        );
+        self.sessions.insert(addr.to_string(), sess);
     }
 
     pub async fn read_message(&mut self) -> Option<(Packet, SocketAddr)> {
@@ -97,10 +87,12 @@ impl RakNetServer {
                     magic: offping.magic,
                     server_name: self.get_server_name(),
                 };
-        
-                self.socket.send_packet(0x1c, &mut offpong.to_buffer(), client).await;
+
+                self.socket
+                    .send_packet(0x1c, &mut offpong.to_buffer(), client)
+                    .await;
                 return None;
-            },
+            }
             0x05 => {
                 trace!("0x{packet_id} RECV = {:?}", body.get_bytes());
 
@@ -115,9 +107,11 @@ impl RakNetServer {
                     mtu: request1.mtu,
                 };
 
-                self.socket.send_packet(0x06, &mut reply1.to_buffer(), client).await;
+                self.socket
+                    .send_packet(0x06, &mut reply1.to_buffer(), client)
+                    .await;
                 return None;
-            },
+            }
             0x07 => {
                 trace!("0x{packet_id} RECV = {:?}", body.get_bytes());
 
@@ -135,15 +129,24 @@ impl RakNetServer {
 
                 sess.guid = request2.client_guid;
 
-                self.socket.send_packet(0x08, &mut reply2.to_buffer(), client).await;
+                self.socket
+                    .send_packet(0x08, &mut reply2.to_buffer(), client)
+                    .await;
                 return None;
             }
             _ => {}
         }
 
-        trace!("0x{packet_id} RECV = {:?}", body.get_bytes());  // rename to body
+        trace!("0x{packet_id} RECV = {:?}", body.get_bytes()); // rename to body
 
-        Some((Packet {packet_id, timestamp: get_unix_milis(), body}, client))
+        Some((
+            Packet {
+                packet_id,
+                timestamp: get_unix_milis(),
+                body,
+            },
+            client,
+        ))
     }
 
     pub async fn mainloop(&mut self) {
@@ -167,7 +170,9 @@ impl RakNetServer {
             for (_, sess) in self.sessions.iter_mut() {
                 let mut packets = std::mem::replace(&mut sess.send_queue, vec![]);
                 for packet in packets.iter_mut() {
-                    self.socket.send_packet(packet.packet_id, &mut packet.body, sess.sockaddr).await;
+                    self.socket
+                        .send_packet(packet.packet_id, &mut packet.body, sess.sockaddr)
+                        .await;
                 }
             }
         }

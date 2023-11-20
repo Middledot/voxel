@@ -2,13 +2,12 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 
-use super::objects::MsgBuffer;
-use super::objects::msgbuffer::Packet;
 use super::objects::datatypes::get_unix_milis;
+use super::objects::msgbuffer::Packet;
+use super::objects::MsgBuffer;
+use super::packets::*;
 use super::packets::{Ack, Nack, OnlineConnAccepted, OnlineConnReq};
 use super::packets::{FromBuffer, ToBuffer};
-use super::packets::*;
-
 
 pub struct Session {
     pub sockaddr: SocketAddr,
@@ -63,14 +62,15 @@ impl Session {
         for _ in 0..frames_queue.len() {
             let frame = frames_queue.remove(0);
             if frameset.currentsize() + frame.totalsize() > self.mtu as u16 {
-                self.send_queue.push(
-                    Packet {
-                        packet_id: 0x84,
-                        timestamp: get_unix_milis(),
-                        body: frameset.to_buffer(),
-                    }
-                );
-                self.resend_queue.lock().unwrap().insert(frameset.index, frameset);
+                self.send_queue.push(Packet {
+                    packet_id: 0x84,
+                    timestamp: get_unix_milis(),
+                    body: frameset.to_buffer(),
+                });
+                self.resend_queue
+                    .lock()
+                    .unwrap()
+                    .insert(frameset.index, frameset);
 
                 self.server_frameset_index += 1;
                 frameset = FrameSet {
@@ -90,7 +90,10 @@ impl Session {
             0xa0 => self.recv_nack(packet).await,
             0xc0 => self.recv_ack(packet).await,
             0x80..=0x8d => self.recv_frame_set(packet).await,
-            _ => panic!("Nous pouvons rien faire | There's nothing we can do ({})", packet.packet_id),
+            _ => panic!(
+                "Nous pouvons rien faire | There's nothing we can do ({})",
+                packet.packet_id
+            ),
         }
     }
 
@@ -109,10 +112,13 @@ impl Session {
 
         for rec in nack_pack.records {
             let frame_set = resend_queue.get_mut(&rec).unwrap();
-            let packet = Packet {packet_id: 0x84, timestamp: packet.timestamp, body: frame_set.to_buffer()};
+            let packet = Packet {
+                packet_id: 0x84,
+                timestamp: packet.timestamp,
+                body: frame_set.to_buffer(),
+            };
 
             self.send_queue.push(packet);
-
         }
     }
 
@@ -143,17 +149,15 @@ impl Session {
                 _ => panic!("oh no"),
             };
 
-            frames_tosend.push(
-                Frame {
-                    flags: frame.flags,
-                    bitlength: (reply.len() * 8) as u16,
-                    bodysize: reply.len() as u16,
-                    reliability: frame.reliability,
-                    fragment_info: frame.fragment_info,
-                    inner_packet_id: 0x10,
-                    body: reply,
-                }
-            );
+            frames_tosend.push(Frame {
+                flags: frame.flags,
+                bitlength: (reply.len() * 8) as u16,
+                bodysize: reply.len() as u16,
+                reliability: frame.reliability,
+                fragment_info: frame.fragment_info,
+                inner_packet_id: 0x10,
+                body: reply,
+            });
         }
 
         self.frames_queue.lock().unwrap().append(&mut frames_tosend);
@@ -165,25 +169,21 @@ impl Session {
         OnlineConnAccepted {
             client_address: self.sockaddr,
             timestamp: request.timestamp,
-        }.to_buffer()
+        }
+        .to_buffer()
     }
 
     pub fn send_nack(&mut self, first: u32, until: u32) {
         let mut records: Vec<u32> = (first..until).collect();
 
-        self.missing_records
-            .lock()
-            .unwrap()
-            .append(&mut records);
+        self.missing_records.lock().unwrap().append(&mut records);
 
         let buf = Nack { records }.to_buffer();
-        self.send_queue.push(
-            Packet {
-                packet_id: 0xa0,
-                timestamp: get_unix_milis(),
-                body: buf
-            }
-        );
+        self.send_queue.push(Packet {
+            packet_id: 0xa0,
+            timestamp: get_unix_milis(),
+            body: buf,
+        });
     }
 
     pub fn send_ack(&mut self, first: u32, until: u32) {
@@ -194,13 +194,11 @@ impl Session {
         }
 
         let buf = Ack { records }.to_buffer();
-        self.send_queue.push(
-            Packet {
-                packet_id: 0xc0,
-                timestamp: get_unix_milis(),
-                body: buf
-            }
-        );
+        self.send_queue.push(Packet {
+            packet_id: 0xc0,
+            timestamp: get_unix_milis(),
+            body: buf,
+        });
     }
 
     // pub fn create_frame(&mut self, old_frame: Frame, packet: Packet) {

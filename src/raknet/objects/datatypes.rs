@@ -107,9 +107,7 @@ pub fn to_address_bytes(addr: &SocketAddr) -> Vec<u8> {
 
 pub fn get_unix_milis() -> u128 {
     let start = SystemTime::now();
-    let since_the_epoch = start
-        .duration_since(UNIX_EPOCH)
-        .expect("Uhm... excuse me");
+    let since_the_epoch = start.duration_since(UNIX_EPOCH).expect("Uhm... excuse me");
     since_the_epoch.as_millis()
 }
 

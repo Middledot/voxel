@@ -16,7 +16,7 @@ fn write_body(input_records: &Vec<u32>, id: u8) -> MsgBuffer {
     for index in 0..records.len() {
         let current = records[index];
         section.push(current);
-        if index+1 < records.len() && records[index+1] == current+1 {
+        if index + 1 < records.len() && records[index + 1] == current + 1 {
             continue;
         }
 

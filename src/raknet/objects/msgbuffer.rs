@@ -17,7 +17,6 @@ pub struct Packet {
     pub body: MsgBuffer,
 }
 
-
 pub struct MsgBuffer {
     buffer: Vec<u8>,
     pos: usize,

@@ -1,7 +1,7 @@
-use tokio::net::UdpSocket;
-use std::net::SocketAddr;
-use std::io::Error;
 use super::objects::MsgBuffer;
+use std::io::Error;
+use std::net::SocketAddr;
+use tokio::net::UdpSocket;
 
 use log::trace;
 
@@ -12,9 +12,7 @@ pub struct Socket {
 impl Socket {
     pub async fn bind(addr: String) -> Self {
         let udpsock = UdpSocket::bind(addr).await.unwrap();
-        Self {
-            udpsock
-        }
+        Self { udpsock }
     }
 
     pub async fn send_packet(&self, packet_id: u8, packet: &mut MsgBuffer, client: SocketAddr) {
@@ -31,7 +29,10 @@ impl Socket {
     }
 
     pub async fn send_to(&self, buf: &[u8], target: SocketAddr) {
-        self.udpsock.send_to(buf, target).await.expect(format!("Failed to send packet to {}", target.to_string()).as_str());
+        self.udpsock
+            .send_to(buf, target)
+            .await
+            .expect(format!("Failed to send packet to {}", target.to_string()).as_str());
     }
 
     pub fn try_recv_from(&self, buf: &mut [u8]) -> Result<(usize, SocketAddr), Error> {

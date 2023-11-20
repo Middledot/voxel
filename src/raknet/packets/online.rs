@@ -1,7 +1,10 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use super::{FromBuffer, ToBuffer};
-use crate::raknet::objects::{datatypes::{to_address_bytes, get_unix_milis}, MsgBuffer};
+use crate::raknet::objects::{
+    datatypes::{get_unix_milis, to_address_bytes},
+    MsgBuffer,
+};
 
 pub struct OnlineConnReq {
     pub guid: i64,
@@ -37,9 +40,7 @@ impl ToBuffer for OnlineConnAccepted {
             buf.write(&mystery_address);
         }
         buf.write_i64_be_bytes(&self.timestamp);
-        buf.write_i64_be_bytes(
-            &(get_unix_milis() as i64),
-        );
+        buf.write_i64_be_bytes(&(get_unix_milis() as i64));
 
         buf
     }

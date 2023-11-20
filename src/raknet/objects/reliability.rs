@@ -36,13 +36,6 @@ impl ReliabilityType {
         }
     }
 
-    pub fn is_unreliable(&self) -> bool {
-        if let ReliabilityType::Unreliable | ReliabilityType::UnreliableSequenced = self {
-            return true;
-        }
-        false
-    }
-
     pub fn is_reliable(&self) -> bool {
         if let ReliabilityType::Reliable
         | ReliabilityType::ReliableSequenced
@@ -112,10 +105,6 @@ impl Reliability {
             ord_frameindex,
             ord_channel,
         }
-    }
-
-    pub fn is_unreliable(&self) -> bool {
-        self.reltype.is_unreliable()
     }
 
     pub fn is_reliable(&self) -> bool {

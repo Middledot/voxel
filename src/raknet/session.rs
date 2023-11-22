@@ -48,14 +48,6 @@ impl Session {
         self.recv_queue.push(packet);
     }
 
-    pub fn pong(&self, mut ping: MsgBuffer) -> MsgBuffer {
-        let mut pong = MsgBuffer::new();
-        pong.write_i64_be_bytes(&ping.read_i64_be_bytes());
-        pong.write_i64_be_bytes(&(get_unix_milis() as i64));
-
-        pong
-    }
-
     pub async fn update(&mut self) {
         let packets = std::mem::take(&mut self.recv_queue);
         for packet in packets {
@@ -113,6 +105,9 @@ impl Session {
 
     pub async fn call_event(&mut self, packet: Packet) -> Option<MsgBuffer> {
         match packet.packet_id {
+            0x00 => Some(
+                self.recv_ping(packet).await
+            ),
             0x07 => {
                 self.recv_connection_request_2(packet).await;
                 None
@@ -128,24 +123,24 @@ impl Session {
             0x09 => Some(
                 self.recv_frame_connection_request(packet).await
             ),
-            0x10 => {
+            0x13 => {
                 self.recv_frame_new_incoming_connection(packet).await;
                 None
             },
             _ => panic!(
-                "Nous pouvons rien faire | There's nothing we can do ({})",
-                packet.packet_id
+                "Nous pouvons rien faire | There's nothing we can do ({}) {:?}",
+                packet.packet_id,
+                packet.body
             ),
         }
     }
 
-    pub async fn recv_ack(&mut self, mut packet: Packet) {
-        let ack_pack = Ack::from_buffer(&mut packet.body);
-        let mut resend_queue = self.resend_queue.lock().unwrap();
+    pub async fn recv_ping(&self, mut packet: Packet) -> MsgBuffer {
+        let mut pong = MsgBuffer::new();
+        pong.write_i64_be_bytes(&packet.body.read_i64_be_bytes());
+        pong.write_i64_be_bytes(&(get_unix_milis() as i64));
 
-        for rec in ack_pack.records {
-            resend_queue.remove(&rec);
-        }
+        pong
     }
 
     pub async fn recv_connection_request_2(&mut self, mut packet: Packet) {
@@ -168,6 +163,15 @@ impl Session {
                 body: reply2.to_buffer(),
             }
         );
+    }
+
+    pub async fn recv_ack(&mut self, mut packet: Packet) {
+        let ack_pack = Ack::from_buffer(&mut packet.body);
+        let mut resend_queue = self.resend_queue.lock().unwrap();
+
+        for rec in ack_pack.records {
+            resend_queue.remove(&rec);
+        }
     }
 
     pub async fn recv_nack(&mut self, mut packet: Packet) {

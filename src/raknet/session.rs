@@ -105,6 +105,10 @@ impl Session {
 
     pub async fn call_event(&mut self, packet: Packet) -> Option<MsgBuffer> {
         match packet.packet_id {
+            0x07 => {
+                self.recv_connection_request_2(packet).await;
+                None
+            }
             0xa0 => {
                 self.recv_nack(packet).await;
                 None
@@ -134,6 +138,28 @@ impl Session {
         for rec in ack_pack.records {
             resend_queue.remove(&rec);
         }
+    }
+
+    pub async fn recv_connection_request_2(&mut self, mut packet: Packet) {
+        let request2 = OfflineConnReq2::from_buffer(&mut packet.body);
+
+        let reply2 = OfflineConnRep2 {
+            magic: request2.magic,
+            server_guid: self.server_guid,
+            client_address: self.sockaddr,
+            mtu: self.mtu,
+            use_encryption: false, // disable encryption // TODO: look into? what is this?
+        };
+
+        self.guid = request2.client_guid;
+
+        self.send_queue.push(
+            Packet {
+                packet_id: 0x08,
+                timestamp: get_unix_milis(),
+                body: reply2.to_buffer(),
+            }
+        );
     }
 
     pub async fn recv_nack(&mut self, mut packet: Packet) {

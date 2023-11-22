@@ -111,28 +111,6 @@ impl RakNetServer {
                     .await;
                 return None;
             }
-            0x07 => {
-                trace!("0x{packet_id} RECV = {:?}", body.get_bytes());
-
-                let sess = self.sessions.get_mut(&client.to_string()).unwrap();
-
-                let request2 = OfflineConnReq2::from_buffer(&mut body);
-
-                let reply2 = OfflineConnRep2 {
-                    magic: request2.magic,
-                    server_guid: sess.server_guid,
-                    client_address: sess.sockaddr,
-                    mtu: sess.mtu,
-                    use_encryption: false, // disable encryption // TODO: look into? what is this?
-                };
-
-                sess.guid = request2.client_guid;
-
-                self.socket
-                    .send_packet(0x08, &mut reply2.to_buffer(), client)
-                    .await;
-                return None;
-            }
             _ => {}
         }
 

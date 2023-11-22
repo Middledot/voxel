@@ -49,9 +49,6 @@ impl ReliabilityType {
     }
 
     pub fn is_sequenced(&self) -> bool {
-        if self.is_ordered() {
-            return true;
-        }
         if let ReliabilityType::UnreliableSequenced | ReliabilityType::ReliableSequenced = self {
             return true;
         }
@@ -60,6 +57,9 @@ impl ReliabilityType {
 
     pub fn is_ordered(&self) -> bool {
         // sequenced implies ordered
+        if self.is_sequenced() {
+            return true;
+        }
         if let ReliabilityType::ReliableOrdered | ReliabilityType::ReliableOrderedACK = self {
             return true;
         }

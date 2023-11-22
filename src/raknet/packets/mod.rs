@@ -10,4 +10,4 @@ pub use obj::{FromBuffer, ToBuffer};
 pub use offline::{
     OfflineConnRep1, OfflineConnRep2, OfflineConnReq1, OfflineConnReq2, OfflinePing, OfflinePong,
 };
-pub use online::{OnlineConnAccepted, OnlineConnReq};
+pub use online::{OnlineConnAccepted, OnlineConnReq, NewIncomingConnection};

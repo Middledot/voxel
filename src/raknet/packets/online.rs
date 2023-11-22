@@ -45,3 +45,20 @@ impl ToBuffer for OnlineConnAccepted {
         buf
     }
 }
+
+pub struct NewIncomingConnection {
+    pub server_address: SocketAddr,
+    pub internal_address: SocketAddr,
+}
+
+impl FromBuffer for NewIncomingConnection {
+    fn from_buffer(buf: &mut MsgBuffer) -> Self {
+        let server_address = buf.read_address();
+        let internal_address = buf.read_address();
+
+        Self {
+            server_address,
+            internal_address,
+        }
+    }
+}

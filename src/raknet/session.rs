@@ -51,7 +51,13 @@ impl Session {
     pub async fn update(&mut self) {
         let packets = std::mem::take(&mut self.recv_queue);
         for packet in packets {
-            self.call_event(packet).await;
+            match packet.packet_id {
+                0x80..=0x8d => {
+                    self.recv_frame_set(packet).await;
+                    None
+                },
+                _ => self.call_event(packet).await,
+            };
         }
 
         self.fs_server_index += 1;
@@ -97,11 +103,23 @@ impl Session {
         }
     }
 
-    pub async fn call_event(&mut self, packet: Packet) {
+    pub async fn call_event(&mut self, packet: Packet) -> Option<MsgBuffer> {
         match packet.packet_id {
-            0xa0 => self.recv_nack(packet).await,
-            0xc0 => self.recv_ack(packet).await,
-            0x80..=0x8d => self.recv_frame_set(packet).await,
+            0xa0 => {
+                self.recv_nack(packet).await;
+                None
+            },
+            0xc0 => {
+                self.recv_ack(packet).await;
+                None
+            },
+            0x09 => Some(
+                self.recv_frame_connection_request(packet).await
+            ),
+            0x10 => {
+                self.recv_frame_new_incoming_connection(packet).await;
+                None
+            },
             _ => panic!(
                 "Nous pouvons rien faire | There's nothing we can do ({})",
                 packet.packet_id
@@ -135,13 +153,6 @@ impl Session {
     }
 
     pub async fn recv_frame_set(&mut self, mut packet: Packet) {
-        // TODO: wtf is this:
-        // [132, 0, 0, 0, 64, 2, 248, 0, 95, 0, 0, 0, 4, 127, 0, 0, 1, 235, 158, 0, 0, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 0, 0, 0, 2, 112, 138, 54, 252, 0, 0, 1, 139, 198, 176, 186, 127]
-        // also [132, 0, 0, 0, 64, 0, 144, 0, 0, 0, 9, 131, 237, 153, 211, 18, 169, 106, 213, 0, 0, 0, 2, 56, 60, 233, 205, 0]
-
-        // break this down [132, 0, 0, 0, 64, 2, 248, 0, 95, 0, 0, 0, 4, 127, 0, 0, 1, 214, 95, 0, 0, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 0, 0, 0, 2, 159, 38, 10, 77, 0, 0, 1, 139, 245, 76, 139, 130]
-        // something might be broken with the stupid frame set code again
-
         let frameset = FrameSet::from_buffer(&mut packet.body);
 
         if frameset.index > self.fs_client_index + 1 {
@@ -159,9 +170,9 @@ impl Session {
                 body: frame.body,
             };
 
-            let mut reply = match frame.inner_packet_id {
-                0x09 => self.recv_frame_connection_request(packet).await,
-                _ => panic!("oh no"),
+            let mut reply = match self.call_event(packet).await {
+                Some(r) => r,
+                None => continue,
             };
 
             frames_to_send.push(Frame {
@@ -186,6 +197,11 @@ impl Session {
             timestamp: request.timestamp,
         }
         .to_buffer()
+    }
+
+    pub async fn recv_frame_new_incoming_connection(&mut self, mut packet: Packet) {
+        let request = NewIncomingConnection::from_buffer(&mut packet.body);
+        println!("bollocks {:?}", request.internal_address);
     }
 
     pub fn send_nack(&mut self, first: u32, until: u32) {

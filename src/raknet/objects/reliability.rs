@@ -23,6 +23,10 @@ impl ReliabilityType {
         // 10000000 >> 5 = 00000100
         // 100 = 4?
         // vvv = 2???
+
+        // debug stuff
+        // println!("{:#010b}", (flags & 0b11100000) >> 5);
+        // println!("{}", (flags & 0b11100000) >> 5);
         match (flags & 0b11100000) >> 5 {
             0 => ReliabilityType::Unreliable,          // 000
             1 => ReliabilityType::UnreliableSequenced, // 001

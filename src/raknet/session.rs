@@ -235,7 +235,7 @@ impl Session {
 
     pub async fn recv_frame_new_incoming_connection(&mut self, mut packet: Packet) {
         let request = NewIncomingConnection::from_buffer(&mut packet.body);
-        println!("bollocks {:?}", request.internal_address);
+        println!("hier {:?}", request.internal_address);
     }
 
     pub fn send_nack(&mut self, first: u32, until: u32) {

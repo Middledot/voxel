@@ -48,7 +48,7 @@ impl Session {
         self.recv_queue.push(packet);
     }
 
-    pub async fn update(&mut self) -> Vec<Packet> {
+    pub async fn update(&mut self) {
         let packets = std::mem::take(&mut self.recv_queue);
         for packet in packets {
             self.call_event(packet).await;
@@ -86,7 +86,15 @@ impl Session {
             frameset.add_frame(frame);
         }
 
-        std::mem::take(&mut self.send_queue)
+        if frameset.frames.len() > 0 {
+            self.send_queue.push(Packet {
+                packet_id: 0x84,
+                timestamp: get_unix_milis(),
+                body: frameset.to_buffer(),
+            })
+        } else {
+            self.fs_server_index -= 1;
+        }
     }
 
     pub async fn call_event(&mut self, packet: Packet) {
@@ -130,6 +138,9 @@ impl Session {
         // TODO: wtf is this:
         // [132, 0, 0, 0, 64, 2, 248, 0, 95, 0, 0, 0, 4, 127, 0, 0, 1, 235, 158, 0, 0, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 0, 0, 0, 2, 112, 138, 54, 252, 0, 0, 1, 139, 198, 176, 186, 127]
         // also [132, 0, 0, 0, 64, 0, 144, 0, 0, 0, 9, 131, 237, 153, 211, 18, 169, 106, 213, 0, 0, 0, 2, 56, 60, 233, 205, 0]
+
+        // break this down [132, 0, 0, 0, 64, 2, 248, 0, 95, 0, 0, 0, 4, 127, 0, 0, 1, 214, 95, 0, 0, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 4, 255, 255, 255, 255, 74, 188, 0, 0, 0, 2, 159, 38, 10, 77, 0, 0, 1, 139, 245, 76, 139, 130]
+        // something might be broken with the stupid frame set code again
 
         let frameset = FrameSet::from_buffer(&mut packet.body);
 

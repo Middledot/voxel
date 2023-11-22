@@ -24,7 +24,7 @@ impl Socket {
         self.send_to(&bytes, client).await;
 
         if packet_id != 0x1c {
-            trace!("0x{packet_id} SENT = {body:?}");
+            trace!("0x{packet_id} SENT = {:?}", &bytes);
         }
     }
 

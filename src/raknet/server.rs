@@ -77,6 +77,13 @@ impl RakNetServer {
         let mut body = MsgBuffer::from(self.buf[1..size].to_vec());
 
         match packet_id {
+            0x00 => {
+                let sess = self.sessions.get(&client.to_string()).unwrap();
+                self.socket
+                    .send_packet(0x03, &mut sess.pong(body), client)
+                    .await;
+                return None;
+            }
             0x01 | 0x02 => {
                 let offping = OfflinePing::from_buffer(&mut body);
 

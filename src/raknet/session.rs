@@ -48,6 +48,14 @@ impl Session {
         self.recv_queue.push(packet);
     }
 
+    pub fn pong(&self, mut ping: MsgBuffer) -> MsgBuffer {
+        let mut pong = MsgBuffer::new();
+        pong.write_i64_be_bytes(&ping.read_i64_be_bytes());
+        pong.write_i64_be_bytes(&(get_unix_milis() as i64));
+
+        pong
+    }
+
     pub async fn update(&mut self) {
         let packets = std::mem::take(&mut self.recv_queue);
         for packet in packets {

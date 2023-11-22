@@ -92,7 +92,7 @@ impl ToBuffer for Frame {
         let mut buf = MsgBuffer::new();
         buf.write_byte(self.flags);
         buf.write_u16_be_bytes(&self.bitlength);
-        buf.write_u16_be_bytes(&self.bodysize);
+        // buf.write_u16_be_bytes(&self.bodysize);
 
         if self.reliability.is_reliable() {
             buf.write_u24_le_bytes(&self.reliability.rel_frameindex.unwrap())

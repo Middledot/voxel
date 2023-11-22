@@ -136,7 +136,7 @@ impl RakNetServer {
             _ => {}
         }
 
-        trace!("0x{packet_id} RECV = {:?}", body.get_bytes()); // rename to body
+        trace!("0x{packet_id} RECV = {:?}", &self.buf[..size]); // rename to body
 
         Some((
             Packet {

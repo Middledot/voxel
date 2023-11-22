@@ -110,6 +110,7 @@ impl ToBuffer for Frame {
             buf.write_i32_be_bytes(&self.fragment_info.index.unwrap());
         }
 
+        buf.write_byte(self.inner_packet_id);
         buf.write_buffer(self.body.get_bytes());
 
         buf

@@ -3,12 +3,10 @@ use crate::raknet::objects::MsgBuffer;
 
 // TODO: acknack can have many bodies of records
 
-fn write_body(input_records: &[u32], id: u8) -> MsgBuffer {
+fn write_body(input_records: &[u32]) -> MsgBuffer {
     // TODO: for some reason it sends this:
     // [192, 0, 1, 1, 0, 0, 0, 0, 0, 0]
     let mut acknack = MsgBuffer::new();
-    acknack.write_byte(id);
-
     let mut records = input_records.to_owned();
     records.sort();
 
@@ -68,7 +66,7 @@ pub struct Ack {
 
 impl ToBuffer for Ack {
     fn to_buffer(&self) -> MsgBuffer {
-        write_body(&self.records, 0xc0)
+        write_body(&self.records)
     }
 }
 
@@ -86,7 +84,7 @@ pub struct Nack {
 
 impl ToBuffer for Nack {
     fn to_buffer(&self) -> MsgBuffer {
-        write_body(&self.records, 0xa0)
+        write_body(&self.records)
     }
 }
 

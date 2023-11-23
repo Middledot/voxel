@@ -1,5 +1,6 @@
 mod config;
 mod raknet;
+mod server;
 
 use log::LevelFilter;
 use log4rs::append::console::ConsoleAppender;
@@ -36,6 +37,9 @@ async fn main() {
         .unwrap();
     let _handle = log4rs::init_config(logconfig).unwrap();
 
-    let mut raknet_server = raknet::server::RakNetListener::new(config).await; // later, make config reference for raknet, and VoxelServer owner
-    raknet_server.mainloop().await;
+    let mut server = server::VoxelServer::init().await;
+    server.run(config).await;
+
+    // let mut raknet_server = raknet::server::RakNetListener::new().await; // later, make config reference for raknet, and VoxelServer owner
+    // raknet_server.mainloop().await;
 }

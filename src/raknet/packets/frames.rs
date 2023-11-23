@@ -59,9 +59,9 @@ impl FromBuffer for Frame {
         fragment_info.extract(buf);
 
         let bodysize = (bitlength + 7) / 8;
-        println!("rel? {:?}", reliability.is_reliable());
-        println!("seq? {:?}", reliability.is_sequenced());
-        println!("ord? {:?}", reliability.is_ordered());
+        // println!("rel? {:?}", reliability.is_reliable());
+        // println!("seq? {:?}", reliability.is_sequenced());
+        // println!("ord? {:?}", reliability.is_ordered());
 
         // println!("{:?}", &flags);
         // println!("{:?}", &bitlength);

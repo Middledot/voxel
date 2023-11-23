@@ -4,6 +4,7 @@
 /// The server, one who handles RakNet packets.
 ///
 /// Reference: https://wiki.vg/Raknet_Protocol
+use futures::future::join_all;
 use rand::Rng;
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -18,7 +19,7 @@ use super::session::Session;
 use super::socket::Socket;
 use crate::config::Config;
 
-pub struct RakNetServer {
+pub struct RakNetListener {
     socket: Socket,
     server_guid: i64,
     config: Config,
@@ -26,7 +27,7 @@ pub struct RakNetServer {
     buf: [u8; 2048],
 }
 
-impl RakNetServer {
+impl RakNetListener {
     pub async fn new(config: Config) -> Self {
         let socket =
             Socket::bind("127.0.0.1:".to_string() + config.get_property("server-port")).await;
@@ -140,6 +141,9 @@ impl RakNetServer {
                 sess.recv(packet);
             }
 
+            // TODO: implement task::spawn around here
+            // also find out if raknet ticks or if that's just a minecraft thing
+            // cuz idk
             for (_, sess) in self.sessions.iter_mut() {
                 sess.update().await;
             }

@@ -15,7 +15,7 @@ impl VoxelServer {
         //     config
         // ).await;
         let me = Self {
-            version: "1.20.31".to_string(),  // dunno what this is yet
+            version: "1.20.41".to_string(),
             protocol_version: "622".to_string()
         };
         return me

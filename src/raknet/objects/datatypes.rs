@@ -27,7 +27,7 @@ pub fn to_i32_be_bytes(value: &i32) -> [u8; 4] {
 
 pub fn from_u24_le_bytes_to_u32(bytes: [u8; 3]) -> u32 {
     let mut newarr = [0u8; 4];
-    newarr[1..=3].copy_from_slice(&bytes[..3]);
+    newarr[..3].copy_from_slice(&bytes[..3]);
 
     u32::from_le_bytes(newarr)
 }
@@ -35,7 +35,7 @@ pub fn from_u24_le_bytes_to_u32(bytes: [u8; 3]) -> u32 {
 pub fn to_u24_le_bytes(value: &u32) -> [u8; 3] {
     let result = value.to_le_bytes();
     let mut newarr = [0u8; 3];
-    newarr[..3].copy_from_slice(&result[1..=3]);
+    newarr[..3].copy_from_slice(&result[..3]);
 
     newarr
 }
@@ -64,22 +64,36 @@ pub fn from_address_bytes(version: u8, bytes: &Vec<u8>) -> SocketAddr {
             IpAddr::V4(Ipv4Addr::new(bytes[0], bytes[1], bytes[2], bytes[3])),
             from_u16_be_bytes([bytes[4], bytes[5]]),
         )
-    } else {
-        // ver == 0x06
+    } else if version == 0x06 {
+        // new stuff taken from nukkit
+        // 0, 1 = family (0x17)
+        // 2, 3 = port
+        // 4, 5, 6, 7 = flow?
+        // 8, 9, 10, 11, 12, 13, 14, 15 = address
         SocketAddr::new(
             IpAddr::V6(Ipv6Addr::new(
+                bytes[8] as u16,
+                bytes[9] as u16,
+                bytes[10] as u16,
+                bytes[11] as u16,
+                bytes[12] as u16,
+                bytes[13] as u16,
+                bytes[14] as u16,
+                bytes[15] as u16,
                 // TODO: rewrite this
-                from_u16_be_bytes([bytes[12], bytes[13]]),
-                from_u16_be_bytes([bytes[14], bytes[15]]),
-                from_u16_be_bytes([bytes[16], bytes[17]]),
-                from_u16_be_bytes([bytes[18], bytes[19]]),
-                from_u16_be_bytes([bytes[20], bytes[21]]),
-                from_u16_be_bytes([bytes[22], bytes[23]]),
-                from_u16_be_bytes([bytes[24], bytes[25]]),
-                from_u16_be_bytes([bytes[26], bytes[27]]),
+                // from_u16_be_bytes([bytes[12], bytes[13]]),
+                // from_u16_be_bytes([bytes[14], bytes[15]]),
+                // from_u16_be_bytes([bytes[16], bytes[17]]),
+                // from_u16_be_bytes([bytes[18], bytes[19]]),
+                // from_u16_be_bytes([bytes[20], bytes[21]]),
+                // from_u16_be_bytes([bytes[22], bytes[23]]),
+                // from_u16_be_bytes([bytes[24], bytes[25]]),
+                // from_u16_be_bytes([bytes[26], bytes[27]]),
             )),
-            from_u16_be_bytes([bytes[1], bytes[2]]),
+            from_u16_be_bytes([bytes[2], bytes[3]]),
         )
+    } else {
+        panic!("not supposed to happen?")
     }
 }
 
@@ -92,7 +106,7 @@ pub fn to_address_bytes(addr: &SocketAddr) -> Vec<u8> {
         address.extend_from_slice(&to_u16_be_bytes(&addr.port()));
     } else if let IpAddr::V6(ip) = addr.ip() {
         address.push(0x06);
-        address.extend_from_slice(&to_u16_be_bytes(&0x17));
+        address.extend_from_slice(&to_u16_be_bytes(&0x17));  // TODO: THIS IS LITTLE-ENDIAN
         address.extend_from_slice(&to_u16_be_bytes(&addr.port()));
 
         let octets = ip.octets();

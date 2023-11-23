@@ -48,17 +48,30 @@ impl ToBuffer for OnlineConnAccepted {
 
 pub struct NewIncomingConnection {
     pub server_address: SocketAddr,
-    pub internal_address: SocketAddr,
+    pub request_timestamp: i64,
+    pub accept_timestamp: i64,
+    // pub internal_address: SocketAddr,
 }
 
 impl FromBuffer for NewIncomingConnection {
     fn from_buffer(buf: &mut MsgBuffer) -> Self {
+        // TODO: for docs
+        // wiki.vg lied to me (!!!)
+        // cross checked JSPrismarine, Nukkit, and GoRaknet for this impl
         let server_address = buf.read_address();
-        let internal_address = buf.read_address();
+        for _ in 0..20 {
+            buf.read_address();
+        }
+
+        let request_timestamp = buf.read_i64_be_bytes();
+        let accept_timestamp = buf.read_i64_be_bytes();
+
+        println!("are at end {:?}", buf.at_end());
 
         Self {
             server_address,
-            internal_address,
+            request_timestamp,
+            accept_timestamp
         }
     }
 }

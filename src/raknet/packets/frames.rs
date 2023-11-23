@@ -3,6 +3,7 @@ use crate::raknet::objects::FragmentInfo;
 use crate::raknet::objects::MsgBuffer;
 use crate::raknet::objects::Reliability;
 
+#[derive(Debug)]
 pub struct Frame {
     pub flags: u8,
     pub bitlength: u16, // remove?
@@ -117,6 +118,7 @@ impl ToBuffer for Frame {
     }
 }
 
+#[derive(Debug)]
 pub struct FrameSet {
     pub index: u32,
     pub frames: Vec<Frame>,

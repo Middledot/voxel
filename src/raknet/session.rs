@@ -60,8 +60,6 @@ impl Session {
             };
         }
 
-        self.fs_server_index += 1;
-
         let mut frameset = FrameSet {
             index: self.fs_server_index,
             frames: vec![],
@@ -81,15 +79,16 @@ impl Session {
                     .lock()
                     .unwrap()
                     .insert(frameset.index, frameset);
-
-                self.fs_server_index += 1;
                 frameset = FrameSet {
-                    index: self.fs_server_index,
+                    index: self.fs_server_index + 1,
                     frames: vec![],
                 };
             }
 
             frameset.add_frame(frame);
+            if frameset.frames.len() == 1 {
+                self.fs_server_index += 1;
+            }
         }
 
         if frameset.frames.len() > 0 {
@@ -98,8 +97,6 @@ impl Session {
                 timestamp: get_unix_milis(),
                 body: frameset.to_buffer(),
             })
-        } else {
-            self.fs_server_index -= 1;
         }
     }
 
@@ -239,7 +236,7 @@ impl Session {
 
     pub async fn recv_frame_new_incoming_connection(&mut self, mut packet: Packet) {
         let request = NewIncomingConnection::from_buffer(&mut packet.body);
-        println!("hier {:?}", request.internal_address);
+        // println!("hier {:?}", request.internal_address);
     }
 
     pub fn send_nack(&mut self, first: u32, until: u32) {

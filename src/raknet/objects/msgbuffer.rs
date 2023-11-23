@@ -163,6 +163,7 @@ impl MsgBuffer {
             from_address_bytes(ipver, &bytes.to_vec())
         } else {
             // if ipver == 0x06
+            // new changes from nukkit
             let mut bytes = [0u8; 28]; // 29-1
             self.read(28, &mut bytes);
             from_address_bytes(ipver, &bytes.to_vec())

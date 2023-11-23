@@ -5,6 +5,7 @@
 /// developed on more later. Refer to frame.rs.
 use super::msgbuffer::MsgBuffer;
 
+#[derive(Debug)]
 pub struct FragmentInfo {
     pub is_fragmented: bool,
     pub compound_size: Option<i32>, // TODO: rename to just size?

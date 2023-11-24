@@ -97,9 +97,13 @@ impl ToBuffer for Frame {
 
         if self.reliability.is_reliable() {
             buf.write_u24_le_bytes(&self.reliability.rel_frameindex.unwrap())
-        } else if self.reliability.is_sequenced() {
+        }
+
+        if self.reliability.is_sequenced() {
             buf.write_u24_le_bytes(&self.reliability.seq_frameindex.unwrap());
-        } else {
+        }
+
+        if self.reliability.is_ordered() {
             // ordered
             buf.write_u24_le_bytes(&self.reliability.ord_frameindex.unwrap());
             buf.write_byte(self.reliability.ord_channel.unwrap());

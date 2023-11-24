@@ -93,10 +93,8 @@ impl RakNetListener {
                 return None;
             }
             0x05 => {
-                trace!("0x{packet_id} RECV = {:?}", body.get_bytes());
-
+                // trace!("0x{packet_id} RECV = {:?}", body.get_bytes());
                 let request1 = OfflineConnReq1::from_buffer(&mut body);
-
                 let reply1 = OfflineConnRep1 {
                     magic: request1.magic,
                     server_guid: self.server_guid,
@@ -110,8 +108,8 @@ impl RakNetListener {
                 return None;
             }
             0x07 => {
+                // trace!("0x{packet_id} RECV = {:?}", body.get_bytes());
                 let request2 = OfflineConnReq2::from_buffer(&mut body);
-
                 let reply2 = OfflineConnRep2 {
                     magic: request2.magic,
                     server_guid: self.server_guid,

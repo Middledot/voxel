@@ -66,8 +66,6 @@ impl FromBuffer for NewIncomingConnection {
         let request_timestamp = buf.read_i64_be_bytes();
         let accept_timestamp = buf.read_i64_be_bytes();
 
-        println!("are at end {:?}", buf.at_end());
-
         Self {
             server_address,
             request_timestamp,

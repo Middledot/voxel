@@ -52,14 +52,14 @@ impl Session {
         let packets = std::mem::take(&mut self.recv_queue);
         for packet in packets {
             match packet.packet_id {
-                0x80..=0x8d => {
-                    self.recv_frame_set(packet).await;
-                    None
-                },
-                _ => self.call_event(packet).await,
+                0xa0 => self.recv_nack(packet).await,
+                0xc0 => self.recv_ack(packet).await,
+                0x80..=0x8d => self.recv_frame_set(packet).await,
+                _ => panic!("Packet ID {} is not implemented", packet.packet_id),
             };
         }
 
+        // package into frame sets
         let mut frameset = FrameSet {
             index: self.fs_server_index,
             frames: vec![],
@@ -100,67 +100,25 @@ impl Session {
         }
     }
 
-    pub async fn call_event(&mut self, packet: Packet) -> Option<MsgBuffer> {
-        match packet.packet_id {
-            0x00 => Some(
-                self.recv_ping(packet).await
-            ),
-            0x07 => {
-                self.recv_connection_request_2(packet).await;
-                None
-            }
-            0xa0 => {
-                self.recv_nack(packet).await;
-                None
-            },
-            0xc0 => {
-                self.recv_ack(packet).await;
-                None
-            },
-            0x09 => Some(
-                self.recv_frame_connection_request(packet).await
-            ),
-            0x13 => {
-                self.recv_frame_new_incoming_connection(packet).await;
-                None
-            },
-            _ => panic!(
-                "Nous pouvons rien faire | There's nothing we can do ({}) {:?}",
-                packet.packet_id,
-                packet.body
-            ),
-        }
-    }
-
-    pub async fn recv_ping(&self, mut packet: Packet) -> MsgBuffer {
-        let mut pong = MsgBuffer::new();
-        pong.write_i64_be_bytes(&packet.body.read_i64_be_bytes());
-        pong.write_i64_be_bytes(&(get_unix_milis() as i64));
-
-        pong
-    }
-
-    pub async fn recv_connection_request_2(&mut self, mut packet: Packet) {
-        let request2 = OfflineConnReq2::from_buffer(&mut packet.body);
-
-        let reply2 = OfflineConnRep2 {
-            magic: request2.magic,
-            server_guid: self.server_guid,
-            client_address: self.sockaddr,
-            mtu: self.mtu,
-            use_encryption: false, // disable encryption // TODO: look into? what is this?
-        };
-
-        self.guid = request2.client_guid;
-
-        self.send_queue.push(
-            Packet {
-                packet_id: 0x08,
-                timestamp: get_unix_milis(),
-                body: reply2.to_buffer(),
-            }
-        );
-    }
+    // pub async fn call_event(&mut self, packet: Packet) -> Option<MsgBuffer> {
+    //     match packet.packet_id {
+    //         0x09 => Some(
+    //             self.recv_frame_connection_request(packet).await
+    //         ),
+    //         0x13 => {
+    //             self.recv_frame_new_incoming_connection(packet).await;
+    //             None
+    //         },
+    //         0xfe => {
+    //             self.game_packet(packet).await;
+    //         }
+    //         _ => panic!(
+    //             "Nous pouvons rien faire | There's nothing we can do ({}) {:?}",
+    //             packet.packet_id,
+    //             packet.body
+    //         ),
+    //     }
+    // }
 
     pub async fn recv_ack(&mut self, mut packet: Packet) {
         let ack_pack = Ack::from_buffer(&mut packet.body);
@@ -187,16 +145,55 @@ impl Session {
         }
     }
 
+    pub fn send_ack(&mut self, first: u32, until: u32) {
+        let records: Vec<u32> = (first..until).collect();
+
+        for rec in &records {
+            self.missing_records.lock().unwrap().push(*rec);
+        }
+
+        let buf = Ack { records }.to_buffer();
+        self.send_queue.push(Packet {
+            packet_id: 0xc0,
+            timestamp: get_unix_milis(),
+            body: buf,
+        });
+    }
+
+    pub fn send_nack(&mut self, first: u32, until: u32) {
+        let mut records: Vec<u32> = (first..until).collect();
+
+        self.missing_records.lock().unwrap().append(&mut records);
+
+        let buf = Nack { records }.to_buffer();
+        self.send_queue.push(Packet {
+            packet_id: 0xa0,
+            timestamp: get_unix_milis(),
+            body: buf,
+        });
+    }
+
+    pub async fn recv_ping(&self, mut packet: Packet) -> MsgBuffer {
+        let mut pong = MsgBuffer::new();
+        pong.write_i64_be_bytes(&packet.body.read_i64_be_bytes());
+        pong.write_i64_be_bytes(&(get_unix_milis() as i64));
+
+        pong
+    }
+
     pub async fn recv_frame_set(&mut self, mut packet: Packet) {
         let frameset = FrameSet::from_buffer(&mut packet.body);
 
-        if frameset.index > self.fs_client_index + 1 {
-            self.send_nack(self.fs_client_index + 1, frameset.index);
+        if frameset.frames.get(0).unwrap().reliability.is_reliable() {
+            if frameset.index > self.fs_client_index + 1 {
+                self.send_nack(self.fs_client_index + 1, frameset.index);
+            }
+            self.send_ack(frameset.index, frameset.index + 1);
         }
-        self.send_ack(frameset.index, frameset.index + 1);
 
         self.fs_client_index = frameset.index;
         let mut frames_to_send: Vec<Frame> = vec![];
+        // let t = frameset.frames.len();
 
         for frame in frameset.frames {
             let packet = Packet {
@@ -205,9 +202,20 @@ impl Session {
                 body: frame.body,
             };
 
-            let mut reply = match self.call_event(packet).await {
-                Some(r) => r,
-                None => continue,
+            // handle no-reply packets
+            match frame.inner_packet_id {
+                0x13 => {
+                    self.recv_frame_new_incoming_connection(packet).await;
+                    continue;
+                },
+                _ => {}
+            };
+
+            let (packet_id, mut reply) = match frame.inner_packet_id {
+                0x00 => (0x03, self.recv_ping(packet).await),
+                0x09 => (0x10, self.recv_frame_connection_request(packet).await),
+                0xfe => (0xfe, self.recv_game_packet(packet).await),
+                _ => panic!("uh oh <:O")
             };
 
             frames_to_send.push(Frame {
@@ -216,7 +224,7 @@ impl Session {
                 bodysize: reply.len() as u16,
                 reliability: frame.reliability,
                 fragment_info: frame.fragment_info,
-                inner_packet_id: 0x10,
+                inner_packet_id: packet_id,
                 body: reply,
             });
         }
@@ -235,39 +243,47 @@ impl Session {
     }
 
     pub async fn recv_frame_new_incoming_connection(&mut self, mut packet: Packet) {
-        let request = NewIncomingConnection::from_buffer(&mut packet.body);
+        let _request = NewIncomingConnection::from_buffer(&mut packet.body);
         // println!("hier {:?}", request.internal_address);
     }
 
-    pub fn send_nack(&mut self, first: u32, until: u32) {
-        let mut records: Vec<u32> = (first..until).collect();
+    pub async fn recv_game_packet(&mut self, mut packet: Packet) -> MsgBuffer {
+        // istg the api is nested as heck
+        // frameset{
+        //    frame{
+        //        gamepacket{
+        //            a game packet,
+        //            ...
+        //        }
+        //    },
+        //    ...
+        // }
+        println!("lol");
 
-        self.missing_records.lock().unwrap().append(&mut records);
+        let mut game_packets = vec![];
 
-        let buf = Nack { records }.to_buffer();
-        self.send_queue.push(Packet {
-            packet_id: 0xa0,
-            timestamp: get_unix_milis(),
-            body: buf,
-        });
-    }
+        loop {
+            if packet.body.at_end() {
+                break;
+            }
 
-    pub fn send_ack(&mut self, first: u32, until: u32) {
-        let records: Vec<u32> = (first..until).collect();
-
-        for rec in &records {
-            self.missing_records.lock().unwrap().push(*rec);
+            let packetsize = packet.body.read_i32_varint_bytes() as usize;
+            game_packets.push(
+                packet.body.read_vec(packetsize)
+            );
         }
 
-        let buf = Ack { records }.to_buffer();
-        self.send_queue.push(Packet {
-            packet_id: 0xc0,
-            timestamp: get_unix_milis(),
-            body: buf,
-        });
+        let mut response: Vec<u8> = vec![];
+
+        for packet in game_packets {
+            let mut resp: Vec<u8> = match packet[0] {
+                0xc1 => vec![11, 0x8f, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                _ => panic!("d"),
+            };
+            response.append(&mut resp);
+        }
+
+        MsgBuffer::from(response)
     }
 
-    // pub fn create_frame(&mut self, old_frame: Frame, packet: Packet) {
-
-    // }
 }

@@ -62,8 +62,8 @@ impl RakNetListener {
         .join(";")
     }
 
-    pub fn create_session(&mut self, mtu: i16, addr: SocketAddr) {
-        let sess = Session::new(addr, 0, self.server_guid, mtu);
+    pub fn create_session(&mut self, mtu: i16, guid: i64, addr: SocketAddr) {
+        let sess = Session::new(addr, guid, self.server_guid, mtu);
 
         self.sessions.insert(addr.to_string(), sess);
     }
@@ -80,7 +80,6 @@ impl RakNetListener {
         match packet_id {
             0x01 | 0x02 => {
                 let offping = OfflinePing::from_buffer(&mut body);
-
                 let offpong = OfflinePong {
                     timestamp: offping.timestamp,
                     server_guid: self.server_guid,
@@ -98,8 +97,6 @@ impl RakNetListener {
 
                 let request1 = OfflineConnReq1::from_buffer(&mut body);
 
-                self.create_session(request1.mtu, client);
-
                 let reply1 = OfflineConnRep1 {
                     magic: request1.magic,
                     server_guid: self.server_guid,
@@ -109,6 +106,24 @@ impl RakNetListener {
 
                 self.socket
                     .send_packet(0x06, &mut reply1.to_buffer(), client)
+                    .await;
+                return None;
+            }
+            0x07 => {
+                let request2 = OfflineConnReq2::from_buffer(&mut body);
+
+                let reply2 = OfflineConnRep2 {
+                    magic: request2.magic,
+                    server_guid: self.server_guid,
+                    client_address: client,
+                    mtu: request2.mtu,
+                    use_encryption: false, // disable encryption // TODO: look into? what is this?
+                };
+
+                self.create_session(request2.mtu, request2.client_guid, client);
+
+                self.socket
+                    .send_packet(0x08, &mut reply2.to_buffer(), client)
                     .await;
                 return None;
             }

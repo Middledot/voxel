@@ -177,6 +177,10 @@ impl MsgBuffer {
     pub fn write_buffer(&mut self, other: &[u8]) {
         self.buffer.extend_from_slice(other)
     }
+
+    pub fn read_i32_varint_bytes(&mut self) -> i32 {
+        from_i32_varint_bytes(self)
+    }
 }
 
 impl std::fmt::Debug for MsgBuffer {

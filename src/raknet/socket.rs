@@ -23,9 +23,12 @@ impl Socket {
 
         self.send_to(&bytes, client).await;
 
-        if packet_id != 0x1c {
-            trace!("0x{packet_id} SENT = {:?}", &bytes);
-        }
+        match packet_id {
+            0x1c => {},
+            0xa0 => {},
+            0xc0 => {},
+            _ => trace!("0x{packet_id} SENT = {:?}", &bytes),
+        };
     }
 
     pub async fn send_to(&self, buf: &[u8], target: SocketAddr) {

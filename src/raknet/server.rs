@@ -130,7 +130,11 @@ impl RakNetListener {
             _ => {}
         }
 
-        trace!("0x{packet_id} RECV = {:?}", &self.buf[..size]); // rename to body
+        match packet_id {
+            0xa0 => {},
+            0xc0 => {},
+            _ => trace!("0x{packet_id} RECV = {:?}", &self.buf[..size]), // rename to body
+        }
 
         Some((
             Packet {

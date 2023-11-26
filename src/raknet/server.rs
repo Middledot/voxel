@@ -95,6 +95,19 @@ impl RakNetListener {
             0x05 => {
                 // trace!("0x{packet_id} RECV = {:?}", body.get_bytes());
                 let request1 = OfflineConnReq1::from_buffer(&mut body);
+
+                if request1.protocol != 11 {
+                    let wrong_proto = IncompatibleProtocol {
+                        magic: request1.magic,
+                        server_guid: self.server_guid
+                    };
+
+                    self.socket
+                        .send_packet(0x19, &mut wrong_proto.to_buffer(), client)
+                        .await;
+                    return None;
+                }
+
                 let reply1 = OfflineConnRep1 {
                     magic: request1.magic,
                     server_guid: self.server_guid,

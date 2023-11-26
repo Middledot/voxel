@@ -45,7 +45,7 @@ impl ToBuffer for OfflinePong {
 
 pub struct OfflineConnReq1 {
     pub magic: [u8; 16],
-    pub protocol: u8, // mysterious magical mystical value, unknown use (always 0x11)
+    pub protocol: u8, // mojang protocol, if not 11, respond with IncompatibleProtocol
     pub mtu: i16,
 }
 
@@ -120,6 +120,23 @@ impl ToBuffer for OfflineConnRep2 {
         buf.write_i64_be_bytes(self.server_guid);
         buf.write_byte(self.use_encryption as u8);
         buf.write_i16_be_bytes(self.mtu);
+
+        buf
+    }
+}
+
+pub struct IncompatibleProtocol {
+    pub magic: [u8; 16],
+    pub server_guid: i64,
+}
+
+impl ToBuffer for IncompatibleProtocol {
+    fn to_buffer(&self) -> MsgBuffer {
+        let mut buf = MsgBuffer::new();
+
+        buf.write_byte(11);  // mojang protocol
+        buf.write_magic(&self.magic);
+        buf.write_i64_be_bytes(self.server_guid);
 
         buf
     }

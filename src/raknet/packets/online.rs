@@ -31,7 +31,7 @@ impl ToBuffer for OnlineConnAccepted {
     fn to_buffer(&self) -> MsgBuffer {
         let mut buf = MsgBuffer::new();
         buf.write_address(&self.client_address);
-        buf.write_i16_be_bytes(&0); // like, ok
+        buf.write_i16_be_bytes(0);
         let mystery_address = to_address_bytes(&SocketAddr::new(
             IpAddr::V4(Ipv4Addr::new(255, 255, 255, 255)),
             19132,
@@ -39,8 +39,8 @@ impl ToBuffer for OnlineConnAccepted {
         for _ in 0..10 {
             buf.write(&mystery_address);
         }
-        buf.write_i64_be_bytes(&self.timestamp);
-        buf.write_i64_be_bytes(&(get_unix_milis() as i64));
+        buf.write_i64_be_bytes(self.timestamp);
+        buf.write_i64_be_bytes(get_unix_milis() as i64);
 
         buf
     }

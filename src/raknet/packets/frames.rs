@@ -92,27 +92,27 @@ impl ToBuffer for Frame {
     fn to_buffer(&self) -> MsgBuffer {
         let mut buf = MsgBuffer::new();
         buf.write_byte(self.flags);
-        buf.write_u16_be_bytes(&self.bitlength);
+        buf.write_u16_be_bytes(self.bitlength);
         // buf.write_u16_be_bytes(&self.bodysize);
 
         if self.reliability.is_reliable() {
-            buf.write_u24_le_bytes(&self.reliability.rel_frameindex.unwrap())
+            buf.write_u24_le_bytes(self.reliability.rel_frameindex.unwrap())
         }
 
         if self.reliability.is_sequenced() {
-            buf.write_u24_le_bytes(&self.reliability.seq_frameindex.unwrap());
+            buf.write_u24_le_bytes(self.reliability.seq_frameindex.unwrap());
         }
 
         if self.reliability.is_ordered() {
             // ordered
-            buf.write_u24_le_bytes(&self.reliability.ord_frameindex.unwrap());
+            buf.write_u24_le_bytes(self.reliability.ord_frameindex.unwrap());
             buf.write_byte(self.reliability.ord_channel.unwrap());
         }
 
         if self.fragment_info.is_fragmented {
-            buf.write_i32_be_bytes(&self.fragment_info.compound_size.unwrap());
-            buf.write_i16_be_bytes(&self.fragment_info.compound_id.unwrap());
-            buf.write_i32_be_bytes(&self.fragment_info.index.unwrap());
+            buf.write_i32_be_bytes(self.fragment_info.compound_size.unwrap());
+            buf.write_i16_be_bytes(self.fragment_info.compound_id.unwrap());
+            buf.write_i32_be_bytes(self.fragment_info.index.unwrap());
         }
 
         buf.write_byte(self.inner_packet_id);
@@ -154,7 +154,7 @@ impl FromBuffer for FrameSet {
 impl ToBuffer for FrameSet {
     fn to_buffer(&self) -> MsgBuffer {
         let mut buf = MsgBuffer::new();
-        buf.write_u24_le_bytes(&self.index);
+        buf.write_u24_le_bytes(self.index);
 
         for fr in self.frames.iter() {
             buf.write_buffer(fr.to_buffer().get_bytes());

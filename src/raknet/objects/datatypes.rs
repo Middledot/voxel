@@ -17,7 +17,7 @@ pub fn from_i64_be_bytes(bytes: [u8; 8]) -> i64 {
     i64::from_be_bytes(bytes)
 }
 
-pub fn to_i64_be_bytes(value: &i64) -> [u8; 8] {
+pub fn to_i64_be_bytes(value: i64) -> [u8; 8] {
     value.to_be_bytes()
 }
 
@@ -25,7 +25,7 @@ pub fn from_u64_be_bytes(bytes: [u8; 8]) -> u64 {
     u64::from_be_bytes(bytes)
 }
 
-pub fn to_u64_be_bytes(value: &u64) -> [u8; 8] {
+pub fn to_u64_be_bytes(value: u64) -> [u8; 8] {
     value.to_be_bytes()
 }
 
@@ -35,7 +35,7 @@ pub fn from_i32_be_bytes(bytes: [u8; 4]) -> i32 {
     i32::from_be_bytes(bytes)
 }
 
-pub fn to_i32_be_bytes(value: &i32) -> [u8; 4] {
+pub fn to_i32_be_bytes(value: i32) -> [u8; 4] {
     value.to_be_bytes()
 }
 
@@ -43,7 +43,7 @@ pub fn from_u32_be_bytes(bytes: [u8; 4]) -> u32 {
     u32::from_be_bytes(bytes)
 }
 
-pub fn to_u32_be_bytes(value: &u32) -> [u8; 4] {
+pub fn to_u32_be_bytes(value: u32) -> [u8; 4] {
     value.to_be_bytes()
 }
 
@@ -51,7 +51,7 @@ pub fn from_i32_le_bytes(bytes: [u8; 4]) -> i32 {
     i32::from_le_bytes(bytes)
 }
 
-pub fn to_i32_le_bytes(value: &i32) -> [u8; 4] {
+pub fn to_i32_le_bytes(value: i32) -> [u8; 4] {
     value.to_le_bytes()
 }
 
@@ -87,7 +87,7 @@ pub fn from_u24_le_bytes_to_u32(bytes: [u8; 3]) -> u32 {
     u32::from_le_bytes(newarr)
 }
 
-pub fn to_u24_le_bytes(value: &u32) -> [u8; 3] {
+pub fn to_u24_le_bytes(value: u32) -> [u8; 3] {
     let result = value.to_le_bytes();
     let mut newarr = [0u8; 3];
     newarr[..3].copy_from_slice(&result[..3]);
@@ -100,7 +100,7 @@ pub fn from_i16_be_bytes(bytes: [u8; 2]) -> i16 {
     i16::from_be_bytes(bytes)
 }
 
-pub fn to_i16_be_bytes(value: &i16) -> [u8; 2] {
+pub fn to_i16_be_bytes(value: i16) -> [u8; 2] {
     value.to_be_bytes()
 }
 
@@ -109,12 +109,12 @@ pub fn from_u16_be_bytes(bytes: [u8; 2]) -> u16 {
     u16::from_be_bytes(bytes)
 }
 
-pub fn to_u16_be_bytes(value: &u16) -> [u8; 2] {
+pub fn to_u16_be_bytes(value: u16) -> [u8; 2] {
     value.to_be_bytes()
 }
 
 
-pub fn to_u16_le_bytes(value: &u16) -> [u8; 2] {
+pub fn to_u16_le_bytes(value: u16) -> [u8; 2] {
     value.to_le_bytes()
 }
 
@@ -167,11 +167,11 @@ pub fn to_address_bytes(addr: &SocketAddr) -> Vec<u8> {
     if let IpAddr::V4(ip) = addr.ip() {
         address.push(0x04);
         address.extend_from_slice(&ip.octets());
-        address.extend_from_slice(&to_u16_be_bytes(&addr.port()));
+        address.extend_from_slice(&to_u16_be_bytes(addr.port()));
     } else if let IpAddr::V6(ip) = addr.ip() {
         address.push(0x06);
-        address.extend_from_slice(&to_u16_le_bytes(&0x17));
-        address.extend_from_slice(&to_u16_be_bytes(&addr.port()));
+        address.extend_from_slice(&to_u16_le_bytes(0x17));
+        address.extend_from_slice(&to_u16_be_bytes(addr.port()));
 
         let octets = ip.octets();
         address.extend_from_slice(&[0, 0, octets[2], octets[3]]);

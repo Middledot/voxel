@@ -34,8 +34,8 @@ pub struct OfflinePong {
 impl ToBuffer for OfflinePong {
     fn to_buffer(&self) -> MsgBuffer {
         let mut buf = MsgBuffer::new();
-        buf.write_i64_be_bytes(&self.timestamp);
-        buf.write_i64_be_bytes(&self.server_guid);
+        buf.write_i64_be_bytes(self.timestamp);
+        buf.write_i64_be_bytes(self.server_guid);
         buf.write_magic(&self.magic);
         buf.write_string(&self.server_name);
 
@@ -74,9 +74,9 @@ impl ToBuffer for OfflineConnRep1 {
     fn to_buffer(&self) -> MsgBuffer {
         let mut buf = MsgBuffer::new();
         buf.write_magic(&self.magic);
-        buf.write_i64_be_bytes(&self.server_guid);
+        buf.write_i64_be_bytes(self.server_guid);
         buf.write_byte(self.use_security as u8);
-        buf.write_i16_be_bytes(&self.mtu);
+        buf.write_i16_be_bytes(self.mtu);
 
         buf
     }
@@ -117,9 +117,9 @@ impl ToBuffer for OfflineConnRep2 {
     fn to_buffer(&self) -> MsgBuffer {
         let mut buf = MsgBuffer::new();
         buf.write_magic(&self.magic);
-        buf.write_i64_be_bytes(&self.server_guid);
+        buf.write_i64_be_bytes(self.server_guid);
         buf.write_byte(self.use_encryption as u8);
-        buf.write_i16_be_bytes(&self.mtu);
+        buf.write_i16_be_bytes(self.mtu);
 
         buf
     }

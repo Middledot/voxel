@@ -2,9 +2,12 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 
+use crate::raknet::objects::datatypes::to_i32_varint_bytes;
+
 use super::objects::datatypes::get_unix_milis;
 use super::objects::msgbuffer::Packet;
-use super::objects::MsgBuffer;
+use super::objects::reliability::ReliabilityType;
+use super::objects::{MsgBuffer, Reliability};
 use super::packets::*;
 use super::packets::{Ack, Nack, OnlineConnAccepted, OnlineConnReq};
 use super::packets::{FromBuffer, ToBuffer};
@@ -67,9 +70,9 @@ impl Session {
 
         let mut frames_queue = self.frames_queue.lock().unwrap();
 
-        for _ in 0..frames_queue.len() {
+        for i in 0..frames_queue.len() {
             let frame = frames_queue.remove(0);
-            if frameset.currentsize() + frame.totalsize() > self.mtu as u16 {
+            if i > 0 {//frameset.currentsize() + frame.totalsize() > self.mtu as u16 {
                 self.send_queue.push(Packet {
                     packet_id: 0x84,
                     timestamp: get_unix_milis(),
@@ -86,9 +89,10 @@ impl Session {
             }
 
             frameset.add_frame(frame);
-            if frameset.frames.len() == 1 {
+            if frameset.frames.len() == 1 && i> 0 {
                 self.fs_server_index += 1;
             }
+            println!("{}", self.fs_server_index);
         }
 
         if frameset.frames.len() > 0 {
@@ -175,8 +179,8 @@ impl Session {
 
     pub async fn recv_ping(&self, mut packet: Packet) -> MsgBuffer {
         let mut pong = MsgBuffer::new();
-        pong.write_i64_be_bytes(&packet.body.read_i64_be_bytes());
-        pong.write_i64_be_bytes(&(get_unix_milis() as i64));
+        pong.write_i64_be_bytes(packet.body.read_i64_be_bytes());
+        pong.write_i64_be_bytes(get_unix_milis() as i64);
 
         pong
     }
@@ -195,7 +199,7 @@ impl Session {
         let mut frames_to_send: Vec<Frame> = vec![];
         // let t = frameset.frames.len();
 
-        for frame in frameset.frames {
+        for mut frame in frameset.frames {
             let packet = Packet {
                 packet_id: frame.inner_packet_id,
                 timestamp: packet.timestamp,
@@ -215,8 +219,41 @@ impl Session {
                 0x00 => (0x03, self.recv_ping(packet).await),
                 0x09 => (0x10, self.recv_frame_connection_request(packet).await),
                 0xfe => (0xfe, self.recv_game_packet(packet).await),
-                _ => panic!("uh oh <:O")
+                0x15 => return,
+                _ => panic!("uh oh <:O {}", frame.inner_packet_id)
             };
+
+            if packet_id == 0xfe {
+                // frame.reliability = Reliability {
+                //     reltype: ReliabilityType::from_flags(64),
+                //     rel_frameindex: Some(2),
+                //     seq_frameindex: None,
+                //     ord_frameindex: None,
+                //     ord_channel: None,
+                // };
+                frame.reliability.ord_frameindex = Some(frame.reliability.ord_frameindex.unwrap() - 1);
+                let fr = Frame {
+                    flags: frame.flags,
+                    bitlength: (reply.len() * 8) as u16,
+                    bodysize: reply.len() as u16,
+                    reliability: frame.reliability,
+                    fragment_info: frame.fragment_info,
+                    inner_packet_id: packet_id,
+                    body: reply,
+                };
+                frames_to_send.push(fr);
+                // let fr2 = Frame {
+                //     flags: frame.flags,
+                //     bitlength: (reply.len() * 8) as u16,
+                //     bodysize: reply.len() as u16,
+                //     reliability: frame.reliability,
+                //     fragment_info: frame.fragment_info,
+                //     inner_packet_id: packet_id,
+                //     body: reply,
+                // };
+                // frames_to_send.push(fr2);
+                continue;
+            }
 
             frames_to_send.push(Frame {
                 flags: frame.flags,
@@ -276,10 +313,27 @@ impl Session {
         let mut response: Vec<u8> = vec![];
 
         for packet in game_packets {
-            let mut resp: Vec<u8> = match packet[0] {
-                0xc1 => vec![11, 0x8f, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                _ => panic!("d"),
-            };
+            let mut reader = MsgBuffer::from(packet);
+            let firstunit = reader.read_i32_varint_bytes();
+            let (sub_client_id, sub_sender_id, packet_id) = (
+                (firstunit & 0x3000) >> 12,
+                (firstunit & 0xc00) >> 10,
+                firstunit & 0x3ff,
+            );
+
+            let mut resp = to_i32_varint_bytes(0_i32 | sub_client_id << 12 | sub_sender_id << 10 | 0x8F);
+            let mut bytes: Vec<u8> = vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+            resp.append(&mut bytes);
+            // let mut resp: Vec<u8> = match packet[0] {
+            //                         // 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            //     0xc1 => {
+            //         // vec![12, 32, 143, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+            //         let mut thing = MsgBuffer::from(packet)
+            //     },
+            //     _ => panic!("d"),
+            // };
+            resp.insert(0, resp.len() as u8);
+            println!("{:?}", &resp);
             response.append(&mut resp);
         }
 

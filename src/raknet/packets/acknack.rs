@@ -18,14 +18,14 @@ fn write_body(input_records: &[u32]) -> MsgBuffer {
             continue;
         }
 
-        acknack.write_i16_be_bytes(&(section.len() as i16));
+        acknack.write_i16_be_bytes(section.len() as i16);
         if section.len() > 1 {
             acknack.write_byte(0x00);
-            acknack.write_u24_le_bytes(section.first().unwrap());
+            acknack.write_u24_le_bytes(*section.first().unwrap());
         } else {
             acknack.write_byte(0x01);
-            acknack.write_u24_le_bytes(section.first().unwrap());
-            acknack.write_u24_le_bytes(section.last().unwrap());
+            acknack.write_u24_le_bytes(*section.first().unwrap());
+            acknack.write_u24_le_bytes(*section.last().unwrap());
         }
         section = vec![];
     }

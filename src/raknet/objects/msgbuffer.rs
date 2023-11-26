@@ -86,7 +86,7 @@ impl MsgBuffer {
         from_i64_be_bytes(result)
     }
 
-    pub fn write_i64_be_bytes(&mut self, value: &i64) {
+    pub fn write_i64_be_bytes(&mut self, value: i64) {
         self.write(&to_i64_be_bytes(value));
     }
 
@@ -97,7 +97,7 @@ impl MsgBuffer {
         from_i32_be_bytes(result)
     }
 
-    pub fn write_i32_be_bytes(&mut self, value: &i32) {
+    pub fn write_i32_be_bytes(&mut self, value: i32) {
         self.write(&to_i32_be_bytes(value));
     }
 
@@ -109,7 +109,7 @@ impl MsgBuffer {
         from_u24_le_bytes_to_u32(result)
     }
 
-    pub fn write_u24_le_bytes(&mut self, value: &u32) {
+    pub fn write_u24_le_bytes(&mut self, value: u32) {
         self.write(&to_u24_le_bytes(value));
     }
 
@@ -120,7 +120,7 @@ impl MsgBuffer {
         from_i16_be_bytes(result)
     }
 
-    pub fn write_i16_be_bytes(&mut self, value: &i16) {
+    pub fn write_i16_be_bytes(&mut self, value: i16) {
         self.write(&to_i16_be_bytes(value));
     }
 
@@ -131,7 +131,7 @@ impl MsgBuffer {
         from_u16_be_bytes(result)
     }
 
-    pub fn write_u16_be_bytes(&mut self, value: &u16) {
+    pub fn write_u16_be_bytes(&mut self, value: u16) {
         self.write(&to_u16_be_bytes(value));
     }
 
@@ -150,7 +150,7 @@ impl MsgBuffer {
         let str: Vec<u8> = str.as_bytes().to_vec();
         let str_len = (str.len()) as i16;
 
-        self.write_i16_be_bytes(&str_len);
+        self.write_i16_be_bytes(str_len);
         self.write(&str);
     }
 

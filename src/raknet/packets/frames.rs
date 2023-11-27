@@ -3,7 +3,7 @@ use crate::raknet::objects::FragmentInfo;
 use crate::raknet::objects::MsgBuffer;
 use crate::raknet::objects::Reliability;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Frame {
     pub flags: u8,
     pub bitlength: u16, // remove?

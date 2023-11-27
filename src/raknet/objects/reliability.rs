@@ -5,7 +5,7 @@
 /// Refer to frame.rs
 use super::MsgBuffer;
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum ReliabilityType {
     Unreliable = 0,
     UnreliableSequenced,
@@ -72,7 +72,7 @@ impl ReliabilityType {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct Reliability {
     reltype: ReliabilityType,
     pub rel_frameindex: Option<u32>,

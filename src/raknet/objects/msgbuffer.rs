@@ -17,6 +17,7 @@ pub struct Packet {
     pub body: MsgBuffer,
 }
 
+#[derive(Debug, Clone)]
 pub struct MsgBuffer {
     buffer: Vec<u8>,
     pos: usize,
@@ -180,11 +181,5 @@ impl MsgBuffer {
 
     pub fn read_i32_varint_bytes(&mut self) -> i32 {
         from_i32_varint_bytes(self)
-    }
-}
-
-impl std::fmt::Debug for MsgBuffer {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:?}", &self.buffer)
     }
 }

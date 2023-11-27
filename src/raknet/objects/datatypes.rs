@@ -70,7 +70,7 @@ pub fn from_i32_varint_bytes(buf: &mut MsgBuffer) -> i32 {
         }
 
         c += 7;
-        if c <= 28 {
+        if c >= 28 {
             panic!("Varint length not within constraints")
         }
     }
@@ -82,10 +82,10 @@ pub fn to_i32_varint_bytes(value: i32) -> Vec<u8> {
     let mut value = u32::from_ne_bytes(value.to_ne_bytes());
 
     let mut vec = vec![];
-    while !value == 0 {
-        let mut temp: u8 = (value as u8) & 0b01111111;  // cast here won't fail (probably)
+    while value != 0 {
+        let mut temp: u8 = (value & 0b01111111_u32) as u8;  // cast here won't fail (probably)
         value = value >> 7;
-        if !value == 0 {
+        if value != 0 {
             temp |= 0b10000000;
         }
         vec.push(temp);

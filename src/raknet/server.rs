@@ -161,7 +161,7 @@ impl RakNetListener {
         loop {
             let last_update_time = get_unix_milis();
 
-            while get_unix_milis() - last_update_time < 50 {
+            while get_unix_milis() - last_update_time < 100 {  // RakNet ticks are a tenth of a second
                 let (packet, client) = match self.read_message().await {
                     Some((packet, client)) => (packet, client),
                     None => continue,

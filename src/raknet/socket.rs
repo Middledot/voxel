@@ -1,4 +1,5 @@
 use super::objects::MsgBuffer;
+use super::objects::msgbuffer::SendPacket;
 use std::io::Error;
 use std::net::SocketAddr;
 use tokio::net::UdpSocket;
@@ -36,6 +37,10 @@ impl Socket {
             .send_to(buf, target)
             .await
             .unwrap_or_else(|_| panic!("Failed to send packet to {}", target));
+    }
+
+    pub async fn send_spacket(&self, mut packet: SendPacket, client: SocketAddr) {
+        self.send_packet(packet.packet_id, &mut packet.body, client).await;
     }
 
     pub fn try_recv_from(&self, buf: &mut [u8]) -> Result<(usize, SocketAddr), Error> {

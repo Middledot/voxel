@@ -2,6 +2,7 @@ use super::{FromBuffer, ToBuffer};
 use crate::raknet::objects::FragmentInfo;
 use crate::raknet::objects::MsgBuffer;
 use crate::raknet::objects::Reliability;
+use crate::raknet::objects::reliability::ReliabilityType;
 
 #[derive(Debug, Clone)]
 pub struct Frame {
@@ -45,6 +46,29 @@ impl Frame {
 
         size
     }
+
+    pub fn from_default_options(packet_id: u8, mut body: MsgBuffer, rel_frameindex: u32, ord_frameindex: u32) -> Self {
+        body.write_byte(packet_id);
+        Self {
+            flags: 96,
+            bitlength: (body.len() * 8) as u16,
+            bodysize: body.len() as u16,
+            reliability: Reliability {
+                reltype: ReliabilityType::from_flags(96),
+                rel_frameindex: Some(rel_frameindex),
+                seq_frameindex: None,
+                ord_frameindex: Some(ord_frameindex),
+                ord_channel: Some(0)
+            },
+            fragment_info: FragmentInfo { is_fragmented: false, compound_size: None, compound_id: None, index: None },
+            inner_packet_id: packet_id,
+            body,
+        }
+    }
+
+    // pub fn from_old_frame(frame: &Frame) -> Self {
+
+    // }
 }
 
 impl FromBuffer for Frame {

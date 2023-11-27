@@ -4,15 +4,18 @@
 /// The server, one who handles RakNet packets.
 ///
 /// Reference: https://wiki.vg/Raknet_Protocol
-use futures::future::join_all;
+
 use rand::Rng;
+use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::task::JoinHandle;
 use std::collections::HashMap;
 use std::net::SocketAddr;
+use std::sync::Arc;
 
-use log::trace;
+use log::{trace, info};
 
 use super::objects::datatypes::get_unix_milis;
-use super::objects::msgbuffer::Packet;
+use super::objects::msgbuffer::{Packet, SendPacket, PacketType, PacketPriority};
 use super::objects::MsgBuffer;
 use super::packets::*;
 use super::session::Session;
@@ -20,7 +23,9 @@ use super::socket::Socket;
 use crate::config::Config;
 
 pub struct RakNetListener {
-    socket: Socket,
+    socket: Arc<Socket>,
+    socket_manager: JoinHandle<()>,
+    tx: Sender<(SendPacket, SocketAddr)>,
     server_guid: i64,
     config: Config,
     sessions: HashMap<String, Session>,
@@ -29,11 +34,29 @@ pub struct RakNetListener {
 
 impl RakNetListener {
     pub async fn new(config: Config) -> Self {
-        let socket =
-            Socket::bind("127.0.0.1:".to_string() + config.get_property("server-port")).await;
+        let (tx, mut sockrx) = tokio::sync::mpsc::channel(32);
+        let socket = Arc::new(Socket::bind("127.0.0.1:".to_string() + config.get_property("server-port")).await);
+
+        let sock_to_manage = socket.clone();
+
+        let manager = tokio::spawn(async move {
+            let socket = sock_to_manage;
+            // Start receiving messages
+
+            loop {
+                let pack = sockrx.recv().await;
+
+                match pack {
+                    Some((spack, client)) => socket.send_spacket(spack, client).await,
+                    None => {}
+                }
+            }
+        });
 
         Self {
             socket,
+            socket_manager: manager,
+            tx,
             server_guid: rand::thread_rng().gen_range(1..=i64::MAX),
             config,
             sessions: HashMap::new(),
@@ -63,7 +86,7 @@ impl RakNetListener {
     }
 
     pub fn create_session(&mut self, mtu: i16, guid: i64, addr: SocketAddr) {
-        let sess = Session::new(addr, guid, self.server_guid, mtu);
+        let sess = Session::new(addr, guid, self.server_guid, mtu, self.tx.clone());
 
         self.sessions.insert(addr.to_string(), sess);
     }
@@ -132,6 +155,7 @@ impl RakNetListener {
                 };
 
                 self.create_session(request2.mtu, request2.client_guid, client);
+                info!("Created Session ({})", client.to_string());
 
                 self.socket
                     .send_packet(0x08, &mut reply2.to_buffer(), client)
@@ -142,8 +166,8 @@ impl RakNetListener {
         }
 
         match packet_id {
-            0xa0 => {},
-            0xc0 => {},
+            // 0xa0 => {},
+            // 0xc0 => {},
             _ => trace!("0x{packet_id} RECV = {:?}", &self.buf[..size]), // rename to body
         }
 
@@ -181,6 +205,7 @@ impl RakNetListener {
             for (_, sess) in self.sessions.iter_mut() {
                 let mut packets = std::mem::take(&mut sess.send_queue);
                 for packet in packets.iter_mut() {
+                    println!("{} / {}", packet.body.len(), sess.mtu);
                     self.socket
                         .send_packet(packet.packet_id, &mut packet.body, sess.sockaddr)
                         .await;

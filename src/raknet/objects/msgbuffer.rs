@@ -8,6 +8,14 @@ use std::net::SocketAddr;
 
 use super::datatypes::*;
 
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub enum PacketPriority {
+    Immediate = 8,
+    High = 4,
+    Medium = 2,
+    Low = 1,
+}
+
 #[derive(Debug)]
 pub struct Packet {
     pub packet_id: u8,
@@ -17,7 +25,28 @@ pub struct Packet {
     pub body: MsgBuffer,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Eq, PartialEq)]
+pub struct SendPacket {
+    pub packet_id: u8,
+    pub body: MsgBuffer,
+    pub priority: PacketPriority,
+}
+
+impl Ord for SendPacket {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.priority.cmp(&other.priority)
+    }
+}
+
+impl PartialOrd for SendPacket {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+
+
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct MsgBuffer {
     buffer: Vec<u8>,
     pos: usize,

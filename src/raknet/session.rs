@@ -1,19 +1,23 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
+use std::collections::BinaryHeap;
+
+use tokio::sync::mpsc::Sender;
 
 use crate::raknet::objects::datatypes::to_i32_varint_bytes;
 
 use super::objects::datatypes::get_unix_milis;
 use super::objects::msgbuffer::Packet;
-use super::objects::reliability::ReliabilityType;
-use super::objects::{MsgBuffer, Reliability};
+use super::objects::{MsgBuffer, msgbuffer::{PacketPriority, SendPacket}};
 use super::packets::*;
 use super::packets::{Ack, Nack, OnlineConnAccepted, OnlineConnReq};
 use super::packets::{FromBuffer, ToBuffer};
 
+
 pub struct Session {
     pub sockaddr: SocketAddr,
+    tx: Sender<(SendPacket, SocketAddr)>,
     pub guid: i64,
     pub server_guid: i64,
     pub mtu: i16,
@@ -21,6 +25,8 @@ pub struct Session {
     fs_client_index: u32,
     rel_client_index: u32,
     rel_server_index: u32,
+    ord_channels: Vec<u32>,
+    pub send_heap: BinaryHeap<SendPacket>,
     pub recv_queue: Vec<Packet>,
     pub send_queue: Vec<Packet>,
     frames_queue: Arc<Mutex<Vec<Frame>>>,
@@ -29,9 +35,10 @@ pub struct Session {
 }
 
 impl Session {
-    pub fn new(sockaddr: SocketAddr, guid: i64, server_guid: i64, mtu: i16) -> Self {
+    pub fn new(sockaddr: SocketAddr, guid: i64, server_guid: i64, mtu: i16, tx: Sender<(SendPacket, SocketAddr)>) -> Self {
         Self {
             sockaddr,
+            tx,
             guid,
             server_guid,
             mtu,
@@ -39,6 +46,8 @@ impl Session {
             fs_client_index: 0,
             rel_client_index: 0,
             rel_server_index: 0,
+            ord_channels: vec![],
+            send_heap: BinaryHeap::new(),
             recv_queue: vec![],
             send_queue: vec![],
             frames_queue: Arc::new(Mutex::new(vec![])),
@@ -47,11 +56,11 @@ impl Session {
         }
     }
 
-    pub fn recv(&mut self, packet: Packet) {
+    pub async fn recv(&mut self, packet: Packet) {
         self.recv_queue.push(packet);
     }
 
-    pub async fn update(&mut self) {
+    pub async fn tick(&mut self) {
         let packets = std::mem::take(&mut self.recv_queue);
         for packet in packets {
             match packet.packet_id {
@@ -72,7 +81,7 @@ impl Session {
 
         for i in 0..frames_queue.len() {
             let frame = frames_queue.remove(0);
-            if i > 0 {//frameset.currentsize() + frame.totalsize() > self.mtu as u16 {
+            if frameset.currentsize() + frame.totalsize() > self.mtu as u16 {
                 self.send_queue.push(Packet {
                     packet_id: 0x84,
                     timestamp: get_unix_milis(),
@@ -89,7 +98,7 @@ impl Session {
             }
 
             frameset.add_frame(frame);
-            if frameset.frames.len() == 1 && i> 0 {
+            if frameset.frames.len() == 1 {
                 self.fs_server_index += 1;
             }
             println!("{}", self.fs_server_index);
@@ -104,25 +113,29 @@ impl Session {
         }
     }
 
-    // pub async fn call_event(&mut self, packet: Packet) -> Option<MsgBuffer> {
-    //     match packet.packet_id {
-    //         0x09 => Some(
-    //             self.recv_frame_connection_request(packet).await
-    //         ),
-    //         0x13 => {
-    //             self.recv_frame_new_incoming_connection(packet).await;
-    //             None
-    //         },
-    //         0xfe => {
-    //             self.game_packet(packet).await;
-    //         }
-    //         _ => panic!(
-    //             "Nous pouvons rien faire | There's nothing we can do ({}) {:?}",
-    //             packet.packet_id,
-    //             packet.body
-    //         ),
-    //     }
-    // }
+    fn send(&mut self, packet: SendPacket) {
+        self.send_heap.push(packet);
+    }
+
+    
+    fn send_frame(&mut self, frame: Frame, priority: PacketPriority) {
+        // immediate frames sent in new frames sets immediately
+        // others are just added to the frames queue + other function to package them
+    }
+    
+    fn send_default_frame(&mut self, packet_id: u8, body: MsgBuffer, priority: PacketPriority) {
+        self.rel_server_index += 1;
+        self.ord_channels[0] += 1;
+
+        self.send_frame(Frame::from_default_options(
+                0x10,
+                body,
+                self.rel_server_index,
+                self.ord_channels[0]
+            ),
+            priority
+        );
+    }
 
     pub async fn recv_ack(&mut self, mut packet: Packet) {
         let ack_pack = Ack::from_buffer(&mut packet.body);
@@ -157,10 +170,10 @@ impl Session {
         }
 
         let buf = Ack { records }.to_buffer();
-        self.send_queue.push(Packet {
+        self.send(SendPacket {
             packet_id: 0xc0,
-            timestamp: get_unix_milis(),
             body: buf,
+            priority: PacketPriority::Immediate
         });
     }
 
@@ -170,19 +183,19 @@ impl Session {
         self.missing_records.lock().unwrap().append(&mut records);
 
         let buf = Nack { records }.to_buffer();
-        self.send_queue.push(Packet {
+        self.send(SendPacket {
             packet_id: 0xa0,
-            timestamp: get_unix_milis(),
             body: buf,
+            priority: PacketPriority::Immediate,
         });
     }
 
-    pub async fn recv_ping(&self, mut packet: Packet) -> MsgBuffer {
+    pub async fn recv_ping(&mut self, mut packet: Packet) {
         let mut pong = MsgBuffer::new();
         pong.write_i64_be_bytes(packet.body.read_i64_be_bytes());
         pong.write_i64_be_bytes(get_unix_milis() as i64);
 
-        pong
+        self.send_default_frame(0x03, pong, PacketPriority::Immediate);
     }
 
     pub async fn recv_frame_set(&mut self, mut packet: Packet) {
@@ -200,6 +213,7 @@ impl Session {
         // let t = frameset.frames.len();
 
         for mut frame in frameset.frames {
+            self.adjust_internal(&frame);
             let packet = Packet {
                 packet_id: frame.inner_packet_id,
                 timestamp: packet.timestamp,
@@ -208,16 +222,14 @@ impl Session {
 
             // handle no-reply packets
             match frame.inner_packet_id {
-                0x13 => {
-                    self.recv_frame_new_incoming_connection(packet).await;
-                    continue;
-                },
-                _ => {}
+                0x00 => {self.recv_ping(packet).await; continue;}
+                0x13 => {self.recv_frame_new_incoming_connection(packet).await; continue;},
+                0x09 => {self.recv_frame_connection_request(packet).await; continue;},
+                // 0x15 => return,  // TODO:
+                _ => {},
             };
 
             let (packet_id, mut reply) = match frame.inner_packet_id {
-                0x00 => (0x03, self.recv_ping(packet).await),
-                0x09 => (0x10, self.recv_frame_connection_request(packet).await),
                 0xfe => (0xfe, self.recv_game_packet(packet).await),
                 0x15 => return,
                 _ => panic!("uh oh <:O {}", frame.inner_packet_id)
@@ -269,18 +281,20 @@ impl Session {
         self.frames_queue.lock().unwrap().append(&mut frames_to_send);
     }
 
-    pub async fn recv_frame_connection_request(&mut self, mut packet: Packet) -> MsgBuffer {
+    pub async fn recv_frame_connection_request(&mut self, mut packet: Packet) {
         let request = OnlineConnReq::from_buffer(&mut packet.body);
 
-        OnlineConnAccepted {
-            client_address: self.sockaddr,
-            timestamp: request.timestamp,
-        }
-        .to_buffer()
+        OnlineConnAccepted {client_address: self.sockaddr, timestamp: request.timestamp}.to_buffer();
+
+        self.rel_server_index += 1;
+        self.ord_channels[0] += 1;
+
+        self.send_default_frame(0x10, OnlineConnAccepted {client_address: self.sockaddr, timestamp: request.timestamp}.to_buffer(), PacketPriority::Medium);
     }
 
     pub async fn recv_frame_new_incoming_connection(&mut self, mut packet: Packet) {
-        let _request = NewIncomingConnection::from_buffer(&mut packet.body);
+        // Technically don't even have to parse this
+        // let _request = NewIncomingConnection::from_buffer(&mut packet.body);
         // println!("hier {:?}", request.internal_address);
     }
 
@@ -340,4 +354,34 @@ impl Session {
         MsgBuffer::from(response)
     }
 
+    pub fn adjust_internal(&mut self, frame: &Frame) {
+        // TODO: THIS ASSUMES THEY'RE SORTED
+        // ARE YOU SURE THEY'RE SORTED?
+        // I DON'T THINK YOU'RE SURE THEY'RE SORTED
+
+        if let Some(rel_frameindex) = frame.reliability.rel_frameindex {
+            if self.rel_client_index < rel_frameindex {
+                self.rel_client_index = rel_frameindex;
+            }
+        }
+
+        // TODO: sequenced stuff
+
+        if frame.reliability.is_ordered() {
+            let ord_channel = frame.reliability.ord_channel.unwrap();
+            let ord_frameindex = frame.reliability.ord_frameindex.unwrap();
+
+            if self.ord_channels.get(ord_channel as usize).unwrap() < &ord_frameindex {
+                self.ord_channels[ord_channel as usize] = ord_frameindex;
+            }
+
+            // if self.ord_channels.contains_key(&ord_channel) {
+            //     if self.ord_channels[&ord_channel] < ord_frameindex {
+            //         *self.ord_channels.get_mut(&ord_channel).unwrap() = ord_frameindex;
+            //     }
+            // } else {
+            //     self.ord_channels.insert(ord_channel, ord_frameindex);
+            // }
+        }
+    }
 }

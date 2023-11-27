@@ -72,9 +72,10 @@ impl ReliabilityType {
     }
 }
 
+
 #[derive(Debug, Copy, Clone)]
 pub struct Reliability {
-    reltype: ReliabilityType,
+    pub reltype: ReliabilityType,
     pub rel_frameindex: Option<u32>,
     pub seq_frameindex: Option<u32>,
     pub ord_frameindex: Option<u32>,

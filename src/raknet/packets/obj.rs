@@ -7,3 +7,7 @@ pub trait FromBuffer {
 pub trait ToBuffer {
     fn to_buffer(&self) -> MsgBuffer;
 }
+
+pub trait PacketID {
+    const ID: u8;
+}

@@ -211,4 +211,16 @@ impl MsgBuffer {
     pub fn read_i32_varint_bytes(&mut self) -> i32 {
         from_i32_varint_bytes(self)
     }
+
+    pub fn read_zigzag32(&mut self) -> i32 {
+        // https://gist.github.com/mfuerstenau/ba870a29e16536fdbaba
+        // https://lemire.me/blog/2022/11/25/making-all-your-integers-positive-with-zigzag-encoding/
+        let val = self.read_i32_be_bytes();
+        if val < 0 {
+            return -2 * val - 1
+        }
+        2 * val
+    }
+
+    // implement other zigzags
 }

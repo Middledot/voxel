@@ -15,7 +15,7 @@ use std::sync::Arc;
 use log::{trace, info};
 
 use super::objects::datatypes::get_unix_milis;
-use super::objects::msgbuffer::{Packet, SendPacket, PacketType, PacketPriority};
+use super::objects::msgbuffer::{Packet, SendPacket, PacketPriority};
 use super::objects::MsgBuffer;
 use super::packets::*;
 use super::session::Session;

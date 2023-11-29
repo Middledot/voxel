@@ -1,6 +1,7 @@
 mod config;
 mod raknet;
 mod server;
+pub mod protocol;
 
 use log::LevelFilter;
 use log4rs::append::console::ConsoleAppender;

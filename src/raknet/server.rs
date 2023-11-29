@@ -199,7 +199,7 @@ impl RakNetListener {
             // also find out if raknet ticks or if that's just a minecraft thing
             // cuz idk
             for (_, sess) in self.sessions.iter_mut() {
-                sess.update().await;
+                sess.tick().await;
             }
 
             for (_, sess) in self.sessions.iter_mut() {

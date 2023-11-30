@@ -119,24 +119,19 @@ class Num(Property):
             self.endianess = Endianess.Big
 
         super().__init__(name, type.lstrip("l"))
-    
+
+    def from_buffer(self) -> str:
+        return "let {0} = buf.read_{1}_{2}_bytes();".format(self.name, self.type, self.get_endianess_abbr())
+
+    def to_buffer(self) -> str:
+        return "buf.write_{1}_{2}_bytes(self.{0});".format(self.name, self.type, self.get_endianess_abbr())
+
     def get_endianess_abbr(self):
         match self.endianess:
             case Endianess.Little:
                 return "le"
             case Endianess.Big:
                 return "be"
-
-
-class i32(Num):
-    def __init__(self, name, type):
-        super().__init__(name, type)
-
-    def from_buffer(self):
-        return "let {0} = buf.read_i32_{1}_bytes();".format(self.name, self.get_endianess_abbr())
-
-    def to_buffer(self):
-        return "buf.write_i32_{1}_bytes(self.{0});".format(self.name, self.get_endianess_abbr())
 
 
 class Mapper(Property):
@@ -173,33 +168,20 @@ class u8(Num):
     def __init__(self, name, type):
         super().__init__(name, type)
 
-    def from_buffer(self):
-        return "let {} = buf.read_byte();".format(self.name)
 
-    def to_buffer(self):
-        return "buf.write_byte(self.{});".format(self.name)
+class i32(Num):
+    def __init__(self, name, type):
+        super().__init__(name, type)
 
 
 class u16(Num):
     def __init__(self, name: str, type):
         super().__init__(name, type)
 
-    def from_buffer(self) -> str:
-        return "let {0} = buf.read_u16_{1}_bytes();".format(self.name, self.get_endianess_abbr())
-
-    def to_buffer(self) -> str:
-        return "buf.write_u16_{1}_bytes(self.{0});".format(self.name, self.get_endianess_abbr())
-
 
 class f32(Num):
     def __init__(self, name, type):
         super().__init__(name, type)
-
-    def from_buffer(self) -> str:
-        return "let {0} = buf.read_f32_{1}_bytes();".format(self.name, self.get_endianess_abbr())
-
-    def to_buffer(self) -> str:
-        return "buf.write_f32_{1}_bytes(self.{0});".format(self.name, self.get_endianess_abbr())
 
 
 

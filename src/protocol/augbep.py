@@ -7,6 +7,8 @@ Will probably port to rust eventually
 
 
 import orjson, textwrap, abc
+from enum import Enum
+from collections import OrderedDict
 
 ## Stuff to do
 # 1. Make MsgBuffer work with the native datatypes (new ones that need to be implemented)
@@ -56,7 +58,34 @@ impl ToBuffer for <CamelCasePacket> {
 # ALSO, enums will be separate files, need special checks for naming
 # same with bitflags
 
+def name_camel_case(name):
+    return ''.join(x.capitalize() for x in name.split('_'))
 
+def get_core_type(type):
+    match type.lstrip("l"):
+        case "u8":
+            return u8
+        case "u16":
+            return u16
+        case "i32":
+            return i32
+        case "f32":
+            return f32
+        case "bool":
+            return Bool
+        case _:
+            return
+
+def get_type(param):
+    if (t := get_core_type(param["type"])):
+        if issubclass(t, Num):
+            return t(param["name"], param["type"])
+        # print("this", t, isinstance(t, Num))
+        return t(param["name"])
+
+class Endianess(Enum):
+    Big = 0
+    Little = 1
 
 class Property:
     def __init__(self, name, type):
@@ -66,9 +95,13 @@ class Property:
         self.name = name
         self.type = type  # replace with type objects (w/ dependencies and such)
 
+    @property
+    def name_camel_case(self):
+        return name_camel_case(self.name)
+
     def attr(self):
         return "pub {0.name}: {0.type},".format(self)
-    
+
     @abc.abstractmethod
     def to_buffer(self) -> str:
         pass
@@ -78,18 +111,107 @@ class Property:
         pass
 
 
-class i32(Property):
-    def __init__(self, name):
-        super().__init__(name, "i32")
+class Num(Property):
+    def __init__(self, name: str, type: str):
+        if type.startswith("l"):
+            self.endianess = Endianess.Little
+        else:
+            self.endianess = Endianess.Big
 
-    def attr(self):
-        return "pub {0.name}: {0.type},".format(self)
+        super().__init__(name, type.lstrip("l"))
+    
+    def get_endianess_abbr(self):
+        match self.endianess:
+            case Endianess.Little:
+                return "le"
+            case Endianess.Big:
+                return "be"
+
+
+class i32(Num):
+    def __init__(self, name, type):
+        super().__init__(name, type)
+
+    def from_buffer(self):
+        return "let {0} = buf.read_i32_{1}_bytes();".format(self.name, self.get_endianess_abbr())
+
+    def to_buffer(self):
+        return "buf.write_i32_{1}_bytes(self.{0});".format(self.name, self.get_endianess_abbr())
+
+
+class Mapper(Property):
+    # TODO:
+    def __init__(self, name, core: dict):
+        super().__init__(name, name_camel_case(name))
+        self.inner_type = get_core_type(core["type"])
+
+        self.items = OrderedDict(
+            sorted(
+                {
+                    int(num): self.inner_type(name, core["type"])
+                    for num, name in core["mappings"].items()
+                }.items(),
+                key=lambda o: o[0],
+            )
+        )
+
+    def attrs(self):
+        finalstr = ""
+        for ind, attr in self.items.items():
+            finalstr += attr.name_camel_case + " = " + str(ind) + ",\n"
+
+        return textwrap.indent(finalstr, "    ")
 
     def from_buffer(self):
         return "let {} = buf.read_i32_be_bytes();".format(self.name)
 
     def to_buffer(self):
         return "buf.write_i32_be_bytes(self.{});".format(self.name)
+
+
+class u8(Num):
+    def __init__(self, name, type):
+        super().__init__(name, type)
+
+    def from_buffer(self):
+        return "let {} = buf.read_byte();".format(self.name)
+
+    def to_buffer(self):
+        return "buf.write_byte(self.{});".format(self.name)
+
+
+class u16(Num):
+    def __init__(self, name: str, type):
+        super().__init__(name, type)
+
+    def from_buffer(self) -> str:
+        return "let {0} = buf.read_u16_{1}_bytes();".format(self.name, self.get_endianess_abbr())
+
+    def to_buffer(self) -> str:
+        return "buf.write_u16_{1}_bytes(self.{0});".format(self.name, self.get_endianess_abbr())
+
+
+class f32(Num):
+    def __init__(self, name, type):
+        super().__init__(name, type)
+
+    def from_buffer(self) -> str:
+        return "let {0} = buf.read_f32_{1}_bytes();".format(self.name, self.get_endianess_abbr())
+
+    def to_buffer(self) -> str:
+        return "buf.write_f32_{1}_bytes(self.{0});".format(self.name, self.get_endianess_abbr())
+
+
+
+class Bool(Property):
+    def __init__(self, name):
+        super().__init__(name, "bool")
+
+    def from_buffer(self):
+        return "let {} = (buf.read_byte() != 0);".format(self.name)
+
+    def to_buffer(self):
+        return "buf.write_byte(self.{} as u8);".format(self.name)
 
 
 class GenericIOObject:
@@ -101,6 +223,33 @@ class GenericIOObject:
         self.name: str = name
 
         self.props: list[Property] = props
+    
+    @property
+    def mappers(self):
+        mappers = []
+        for prop in self.props:
+            if isinstance(prop, Mapper):
+                mappers.append(prop)
+
+        if not mappers:
+            return ""
+        print([i.name for i in mappers])
+        
+        finalstr = (
+            "\n"
+            "pub enum {0.name_camel_case} {{\n"
+            "{1}"
+            "}}\n"
+            "\n"
+            "impl {0.name_camel_case} {{\n"
+            "    pub fn from_{0.inner_type.__name__}(&self, index: {0.inner_type.__name__}) {{\n"
+            "        // nothing\n"
+            "    }}\n"
+            "}}\n"
+            "\n"
+        ).format(mappers[0], mappers[0].attrs())
+
+        return finalstr
 
     @property
     def name_camel_case(self):
@@ -150,45 +299,50 @@ class GenericIOObject:
 
     def format(self):
         return (
-            "/* Auto-generated by augbep */\n" \
-            "{0.all_deps}\n" \
-            "\n" \
-            "struct {0.name_camel_case} {{\n" \
-            "{1}" \
-            "}}\n" \
-            "\n" \
-            "impl PacketID for {0.name_camel_case} {{\n" \
-            "    const ID: u8 = {0.fmt_packet_id}\n" \
-            "}}\n" \
+            "/* Auto-generated by augbep */\n"
+            "{0.all_deps}\n"
+            "{4}"
             "\n"
-            "impl FromBuffer for {0.name_camel_case} {{\n" \
-            "    fn from_buffer(buf: &mut MsgBuffer) -> Self {{\n" \
-            "{2}\n" \
-            "    }}\n" \
-            "}}\n" \
-            "\n" \
-            "impl ToBuffer for {0.name_camel_case} {{\n" \
-            "    fn to_buffer(&self) -> MsgBuffer {{\n" \
+            "pub struct {0.name_camel_case} {{\n"
+            "{1}"
+            "}}\n"
+            "\n"
+            "impl PacketID for {0.name_camel_case} {{\n"
+            "    const ID: u8 = {0.fmt_packet_id}\n"
+            "}}\n"
+            "\n"
+            "impl FromBuffer for {0.name_camel_case} {{\n"
+            "    fn from_buffer(buf: &mut MsgBuffer) -> Self {{\n"
+            "{2}\n"
+            "    }}\n"
+            "}}\n"
+            "\n"
+            "impl ToBuffer for {0.name_camel_case} {{\n"
+            "    fn to_buffer(&self) -> MsgBuffer {{\n"
             "        let mut buf = MsgBuffer::new();\n"
-            "{3}" \
-            "\n" \
-            "        buf\n" \
-            "    }}\n" \
-            "}}\n" \
-        ).format(self, self.attrs(), self.from_buffer(), self.to_buffer())  #, self.from_buffer(), self.to_buffer())
+            "{3}"
+            "\n"
+            "        buf\n"
+            "    }}\n"
+            "}}\n"
+        ).format(self, self.attrs(), self.from_buffer(), self.to_buffer(), self.mappers)  #, self.from_buffer(), self.to_buffer())
 
     @classmethod
     def from_data(cls, packet_id: int, name: str, blueprint: dict):
         props = []
         for param in blueprint:
-            if param.get("type") == "i32":
-                props.append(
-                    i32(param["name"])
-                )
+            if not param.get("type"):
                 continue
-            props.append(
-                Property(**param)
-            )
+
+            if isinstance(param["type"], list) and param["type"][0] == "mapper":
+                props.append(Mapper(param["name"], param["type"][1]))
+            elif (prop := get_type(param)):
+                props.append(prop)
+            else:
+                props.append(
+                    Property(**param)
+                )
+
         return cls(packet_id, name, props)
 
 
@@ -252,7 +406,8 @@ class AugbepParser:
                     name,
                     blueprint
                 )
-            except:
+            except Exception as e:
+                # print(e)
                 pass
             else:
                 self.genericio.append(gen)
@@ -261,8 +416,10 @@ class AugbepParser:
             with open(self.folder + obj.name + ".rs", "w") as fp:
                 try:
                     fp.write(obj.format())
-                except:
-                    pass
+                except Exception as e:
+                    # print('bruh')
+                    import traceback
+                    fp.write(traceback.format_exc())
 
         with open(self.folder + "mod.rs", "w") as fp:
             for mod in self.genericio:

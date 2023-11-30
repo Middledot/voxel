@@ -59,22 +59,18 @@ impl ToBuffer for <CamelCasePacket> {
 # same with bitflags
 
 def name_camel_case(name):
+    if name.startswith("_"):
+        name = name[1:]
     return ''.join(x.capitalize() for x in name.split('_'))
 
 def get_core_type(type):
     match type.lstrip("l"):
         case "u8":
             return u8
-        case "u16":
-            return u16
-        case "i32":
-            return i32
-        case "f32":
-            return f32
         case "bool":
             return Bool
         case _:
-            return
+            return Num
 
 def get_type(param):
     if (t := get_core_type(param["type"])):
@@ -83,15 +79,19 @@ def get_type(param):
         # print("this", t, isinstance(t, Num))
         return t(param["name"])
 
+
 class Endianess(Enum):
     Big = 0
     Little = 1
+
 
 class Property:
     def __init__(self, name, type):
         self.abs_deps = []
         self.deps = []
 
+        if name in ["type"]:
+            name = f"_{name}"
         self.name = name
         self.type = type  # replace with type objects (w/ dependencies and such)
 
@@ -149,6 +149,21 @@ class Mapper(Property):
                 key=lambda o: o[0],
             )
         )
+    
+    def from_int(self):
+        if len(self.items) == 0:
+            return ""
+
+        finalstr = "\n        match value {\n"
+        contents = ""
+
+        for ind, prop in self.items.items():
+            contents += "{0} => {1}::{2},\n".format(ind, self.name_camel_case, prop.name_camel_case)
+
+        finalstr += textwrap.indent(contents, "            ")
+        finalstr += "        }\n    "
+
+        return finalstr
 
     def attrs(self):
         finalstr = ""
@@ -158,15 +173,24 @@ class Mapper(Property):
         return textwrap.indent(finalstr, "    ")
 
     def from_buffer(self):
-        return "let {} = buf.read_i32_be_bytes();".format(self.name)
+        # my names hacker, pro hacker
+        datatype = next(iter(self.items.values()))
+        return "let {0.name} = {0.name_camel_case}::from_{2}({1});".format(self, datatype.from_buffer().split(" = ")[1].rstrip(";"), self.inner_type.type)
 
     def to_buffer(self):
-        return "buf.write_i32_be_bytes(self.{});".format(self.name)
+        datatype = next(iter(self.items.values()))
+        return "{1}(self.{0} as {2});".format(self.name, datatype.to_buffer().split("(")[0], self.inner_type.type)
 
 
 class u8(Num):
     def __init__(self, name, type):
         super().__init__(name, type)
+
+    def from_buffer(self) -> str:
+        return "let {} = buf.read_byte();".format(self.name)
+    
+    def to_buffer(self) -> str:
+        return "buf.write_byte(self.{});".format(self.name)
 
 
 class i32(Num):
@@ -184,13 +208,12 @@ class f32(Num):
         super().__init__(name, type)
 
 
-
 class Bool(Property):
     def __init__(self, name):
         super().__init__(name, "bool")
 
     def from_buffer(self):
-        return "let {} = (buf.read_byte() != 0);".format(self.name)
+        return "let {} = buf.read_byte() != 0;".format(self.name)
 
     def to_buffer(self):
         return "buf.write_byte(self.{} as u8);".format(self.name)
@@ -215,7 +238,6 @@ class GenericIOObject:
 
         if not mappers:
             return ""
-        print([i.name for i in mappers])
         
         finalstr = (
             "\n"
@@ -224,12 +246,12 @@ class GenericIOObject:
             "}}\n"
             "\n"
             "impl {0.name_camel_case} {{\n"
-            "    pub fn from_{0.inner_type.__name__}(&self, index: {0.inner_type.__name__}) {{\n"
-            "        // nothing\n"
-            "    }}\n"
+            "    pub fn from_{0.inner_type.type}(value: {0.inner_type.type}) -> Self {{"
+            "{2}"
+            "}}\n"
             "}}\n"
             "\n"
-        ).format(mappers[0], mappers[0].attrs())
+        ).format(mappers[0], mappers[0].attrs(), mappers[0].from_int())
 
         return finalstr
 
@@ -395,13 +417,16 @@ class AugbepParser:
                 self.genericio.append(gen)
 
         for obj in self.genericio:
-            with open(self.folder + obj.name + ".rs", "w") as fp:
-                try:
-                    fp.write(obj.format())
-                except Exception as e:
-                    # print('bruh')
-                    import traceback
-                    fp.write(traceback.format_exc())
+            var = ""
+            try:
+                var = (obj.format())
+            except Exception as e:
+                # print('bruh')
+                import traceback
+                var = (traceback.format_exc())
+            else:
+                with open(self.folder + obj.name + ".rs", "w") as fp:
+                    fp.write(var)
 
         with open(self.folder + "mod.rs", "w") as fp:
             for mod in self.genericio:

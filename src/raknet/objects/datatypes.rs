@@ -47,6 +47,7 @@ pub fn to_u32_be_bytes(value: u32) -> [u8; 4] {
     value.to_be_bytes()
 }
 
+
 pub fn from_i32_le_bytes(bytes: [u8; 4]) -> i32 {
     i32::from_le_bytes(bytes)
 }
@@ -54,6 +55,16 @@ pub fn from_i32_le_bytes(bytes: [u8; 4]) -> i32 {
 pub fn to_i32_le_bytes(value: i32) -> [u8; 4] {
     value.to_le_bytes()
 }
+
+
+pub fn from_f32_le_bytes(bytes: [u8; 4]) -> f32 {
+    f32::from_le_bytes(bytes)
+}
+
+pub fn to_f32_le_bytes(value: f32) -> [u8; 4] {
+    value.to_le_bytes()
+}
+
 
 pub fn from_i32_varint_bytes(buf: &mut MsgBuffer) -> i32 {
     // taken from JSPrismarine
@@ -130,6 +141,10 @@ pub fn to_u16_be_bytes(value: u16) -> [u8; 2] {
     value.to_be_bytes()
 }
 
+
+pub fn from_u16_le_bytes(bytes: [u8; 2]) -> u16 {
+    u16::from_le_bytes(bytes)
+}
 
 pub fn to_u16_le_bytes(value: u16) -> [u8; 2] {
     value.to_le_bytes()

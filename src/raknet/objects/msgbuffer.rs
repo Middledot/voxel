@@ -131,6 +131,17 @@ impl MsgBuffer {
         self.write(&to_i32_be_bytes(value));
     }
 
+    pub fn read_f32_le_bytes(&mut self) -> f32 {
+        let mut result = [0u8; 4];
+        self.read(4, &mut result);
+
+        from_f32_le_bytes(result)
+    }
+
+    pub fn write_f32_le_bytes(&mut self, value: f32) {
+        self.write(&to_f32_le_bytes(value));
+    }
+
     pub fn read_u24_le_bytes(&mut self) -> u32 {
         // we pretend it's a u24 but really we're using u32
         let mut result = [0u8; 3];
@@ -163,6 +174,17 @@ impl MsgBuffer {
 
     pub fn write_u16_be_bytes(&mut self, value: u16) {
         self.write(&to_u16_be_bytes(value));
+    }
+
+    pub fn read_u16_le_bytes(&mut self) -> u16 {
+        let mut result = [0u8; 2];
+        self.read(2, &mut result);
+
+        from_u16_le_bytes(result)
+    }
+
+    pub fn write_u16_le_bytes(&mut self, value: u16) {
+        self.write(&to_u16_le_bytes(value));
     }
 
     pub fn read_magic(&mut self) -> [u8; 16] {

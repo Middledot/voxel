@@ -1,6 +1,6 @@
 """
 Python script to auto-generate the readers/writers for the MCBE protocol
-(Au)tomatically (G)enerated (B)edrock (E)dition (P)rotocol
+(Au)tomatic (Be)drock (P)rotocol (pronounced aw-bep)
 
 Will probably port to rust eventually
 """

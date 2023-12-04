@@ -71,6 +71,11 @@ impl Session {
             };
         }
 
+        // if self.send_heap.peek().unwrap().priority == PacketPriority::Immediate {
+        //     return true;
+        // }
+        // return false;
+
         // package into frame sets
         let mut frameset = FrameSet {
             index: self.fs_server_index,
@@ -78,8 +83,14 @@ impl Session {
         };
 
         let mut frames_queue = self.frames_queue.lock().unwrap();
+        frames_queue.sort_by_key(|x| {
+            match x.reliability.rel_frameindex {
+                Some(e) => e,
+                None => 4
+            }
+        });
 
-        for i in 0..frames_queue.len() {
+        for _ in 0..frames_queue.len() {
             let frame = frames_queue.remove(0);
             if frameset.currentsize() + frame.totalsize() > self.mtu as u16 {
                 self.send_queue.push(Packet {
@@ -101,12 +112,12 @@ impl Session {
             if frameset.frames.len() == 1 {
                 self.fs_server_index += 1;
             }
-            println!("{}", self.fs_server_index);
+            // println!("{}", self.fs_server_index);
         }
 
         if frameset.frames.len() > 0 {
             self.send_queue.push(Packet {
-                packet_id: 0x84,
+                packet_id: 0x80,
                 timestamp: get_unix_milis(),
                 body: frameset.to_buffer(),
             })
@@ -121,11 +132,24 @@ impl Session {
     fn send_frame(&mut self, frame: Frame, priority: PacketPriority) {
         // immediate frames sent in new frames sets immediately
         // others are just added to the frames queue + other function to package them
+        // 0000   02 00 00 00 45 00 00 38 7a 44 00 00 80 11 00 00   ....E..8zD......
+        // 0010   7f 00 00 01 7f 00 00 01 4a be ee 2c 00 24 e6 a3   ........J..,.$..
+        // 0020   80 04 00 00 64 00 70 01 00 00 00 00 00 00 fe 0c   ....d.p.........
+        // 0030   8f 01 01 00 00 00 00 00 00 00 00 00               ............
+        // if priority == PacketPriority::Immediate {
+        //     let indiv_frameset
+        //     self.tx.send(())
+        // }
+        self.frames_queue.lock().unwrap().push(frame)
     }
-    
+
     fn send_default_frame(&mut self, packet_id: u8, body: MsgBuffer, priority: PacketPriority) {
         self.rel_server_index += 1;
-        self.ord_channels[0] += 1;
+
+        match self.ord_channels.get(0) {
+            Some(_) => self.ord_channels[0] += 1,
+            None => self.ord_channels.insert(0, 0),
+        }
 
         self.send_frame(Frame::from_default_options(
                 0x10,
@@ -210,7 +234,6 @@ impl Session {
 
         self.fs_client_index = frameset.index;
         let mut frames_to_send: Vec<Frame> = vec![];
-        // let t = frameset.frames.len();
 
         for mut frame in frameset.frames {
             self.adjust_internal(&frame);
@@ -286,8 +309,8 @@ impl Session {
 
         OnlineConnAccepted {client_address: self.sockaddr, timestamp: request.timestamp}.to_buffer();
 
-        self.rel_server_index += 1;
-        self.ord_channels[0] += 1;
+        // self.rel_server_index += 1;
+        // self.ord_channels[0] += 1;
 
         self.send_default_frame(0x10, OnlineConnAccepted {client_address: self.sockaddr, timestamp: request.timestamp}.to_buffer(), PacketPriority::Medium);
     }
@@ -309,6 +332,7 @@ impl Session {
         //    },
         //    ...
         // }
+        // http://www.raknet.net/raknet/manual/systemoverview.html
         println!("lol");
 
         let mut game_packets = vec![];
@@ -335,8 +359,12 @@ impl Session {
                 firstunit & 0x3ff,
             );
 
-            let mut resp = to_i32_varint_bytes(0_i32 | sub_client_id << 12 | sub_sender_id << 10 | 0x8F);
-            let mut bytes: Vec<u8> = vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+            if packet_id == 0x01 {
+                panic!("Ooooooooooooooooooooooo");
+            }
+
+            let mut resp = to_i32_varint_bytes(0_i32 | 0 /*sub_client_id << 12*/ | 0 /*sub_sender_id << 10*/ | 0x8F);
+            let mut bytes: Vec<u8> = vec![1, 0, 0, 0, 0, 0, 0, 0, 0, 0];
             resp.append(&mut bytes);
             // let mut resp: Vec<u8> = match packet[0] {
             //                         // 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0
@@ -346,6 +374,7 @@ impl Session {
             //     },
             //     _ => panic!("d"),
             // };
+            // [-2, 12, 143, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]
             resp.insert(0, resp.len() as u8);
             println!("{:?}", &resp);
             response.append(&mut resp);

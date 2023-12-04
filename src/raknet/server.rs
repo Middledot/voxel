@@ -94,7 +94,8 @@ impl RakNetListener {
     pub async fn read_message(&mut self) -> Option<(Packet, SocketAddr)> {
         let (size, client) = match self.socket.try_recv_from(&mut self.buf) {
             Ok((packetsize, client)) => (packetsize, client),
-            Err(_e) => return None, // panic!("recv function failed: {e:?}"),
+            Err(ref e) if e.to_string() == "operation would block".to_string() => return None,
+            Err(e) => panic!("recv function failed: {e:?}"),
         };
 
         let packet_id = self.buf[0];
@@ -115,7 +116,7 @@ impl RakNetListener {
                     .await;
                 return None;
             }
-            0x05 => {
+            0x05 => {  // ((ip.src == 192.168.66.151 && ip.dst == 192.168.66.0/8) || (ip.src == 192.168.66.0/8 && ip.dst == 192.168.66.151))
                 // trace!("0x{packet_id} RECV = {:?}", body.get_bytes());
                 let request1 = OfflineConnReq1::from_buffer(&mut body);
 
@@ -192,14 +193,19 @@ impl RakNetListener {
                 };
 
                 let sess = self.sessions.get_mut(&client.to_string()).unwrap();
-                sess.recv(packet);
+                sess.recv(packet).await;
             }
 
             // TODO: implement task::spawn around here
             // also find out if raknet ticks or if that's just a minecraft thing
             // cuz idk
             for (_, sess) in self.sessions.iter_mut() {
-                sess.tick().await;
+                /*let immediates = */ sess.tick().await;
+                // if immediates {
+                //     while sess.send_heap.peek().unwrap().priority == PacketPriority::Immediate {
+                //         self.socket.send_spacket(sess.send_heap.pop().unwrap(), sess.sockaddr).await;
+                //     }
+                // }
             }
 
             for (_, sess) in self.sessions.iter_mut() {

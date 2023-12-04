@@ -51,7 +51,6 @@ impl Frame {
     }
 
     pub fn from_default_options(packet_id: u8, mut body: MsgBuffer, rel_frameindex: u32, ord_frameindex: u32) -> Self {
-        body.write_byte(packet_id);
         Self {
             flags: 96,
             bitlength: (body.len() * 8) as u16,

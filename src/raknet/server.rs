@@ -8,13 +8,13 @@ use rand::Rng;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::mpsc::Sender;
 use tokio::task::JoinHandle;
 
 use log::{info, trace};
 
 use super::objects::datatypes::get_unix_milis;
-use super::objects::msgbuffer::{Packet, PacketPriority, SendPacket};
+use super::objects::msgbuffer::{Packet, SendPacket};
 use super::objects::MsgBuffer;
 use super::packets::*;
 use super::session::Session;
@@ -47,9 +47,8 @@ impl RakNetListener {
             loop {
                 let pack = sockrx.recv().await;
 
-                match pack {
-                    Some((spack, client)) => socket.send_spacket(spack, client).await,
-                    None => {}
+                if let Some((spack, client)) = pack {
+                    socket.send_spacket(spack, client).await;
                 }
             }
         });
@@ -95,7 +94,7 @@ impl RakNetListener {
     pub async fn read_message(&mut self) -> Option<(Packet, SocketAddr)> {
         let (size, client) = match self.socket.try_recv_from(&mut self.buf) {
             Ok((packetsize, client)) => (packetsize, client),
-            Err(ref e) if e.to_string() == "operation would block".to_string() => return None,
+            Err(ref e) if e.to_string() == *"operation would block" => return None,
             Err(e) => panic!("recv function failed: {e:?}"),
         };
 

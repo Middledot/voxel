@@ -90,7 +90,7 @@ pub fn to_i32_varint_bytes(value: i32) -> Vec<u8> {
     let mut vec = vec![];
     while value != 0 {
         let mut temp: u8 = (value & 0b01111111_u32) as u8; // cast here won't fail (probably)
-        value = value >> 7;
+        value >>= 7;
         if value != 0 {
             temp |= 0b10000000;
         }

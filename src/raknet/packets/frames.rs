@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 
 use super::{FromBuffer, ToBuffer};
-use crate::raknet::objects::datatypes::get_unix_milis;
+
 use crate::raknet::objects::msgbuffer::PacketPriority;
 use crate::raknet::objects::msgbuffer::SendPacket;
 use crate::raknet::objects::reliability::ReliabilityType;

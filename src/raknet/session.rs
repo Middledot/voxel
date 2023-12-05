@@ -126,16 +126,13 @@ impl Session {
                 Some(pack) => pack,
                 None => return,
             };
-            current_prio = frame.priority.clone().unwrap();
+            current_prio = frame.priority.unwrap();
 
-            match frameset.try_add_frame(frame, self.mtu as u16) {
-                Some(new_frameset) => {
-                    self.send_heap.push(frameset.package(current_prio));
-                    resend_queue.insert(frameset.index, frameset);
-                    frameset = new_frameset;
-                    self.fs_server_index += 1; // I already increment in try_add_frame, just need to match here
-                }
-                None => {}
+            if let Some(new_frameset) = frameset.try_add_frame(frame, self.mtu as u16) {
+                self.send_heap.push(frameset.package(current_prio));
+                resend_queue.insert(frameset.index, frameset);
+                frameset = new_frameset;
+                self.fs_server_index += 1; // I already increment in try_add_frame, just need to match here                
             }
         }
 
@@ -323,10 +320,10 @@ impl Session {
             }
             .to_buffer(),
             PacketPriority::Medium,
-        );
+        ).await;
     }
 
-    pub async fn recv_frame_new_incoming_connection(&mut self, packet: Packet) {
+    pub async fn recv_frame_new_incoming_connection(&mut self, _packet: Packet) {
         // Technically don't even have to parse this
         // let _request = NewIncomingConnection::from_buffer(&mut packet.body);
         // println!("hier {:?}", request.internal_address);
@@ -362,7 +359,7 @@ impl Session {
         for packet in game_packets {
             let mut reader = MsgBuffer::from(packet);
             let firstunit = reader.read_i32_varint_bytes();
-            let (sub_client_id, sub_sender_id, packet_id) = (
+            let (_sub_client_id, _sub_sender_id, packet_id) = (
                 (firstunit & 0x3000) >> 12,
                 (firstunit & 0xc00) >> 10,
                 firstunit & 0x3ff,
@@ -391,7 +388,7 @@ impl Session {
             response.append(&mut resp);
         }
 
-        self.send_default_frame(0xfe, MsgBuffer::from(response), PacketPriority::Medium);
+        self.send_default_frame(0xfe, MsgBuffer::from(response), PacketPriority::Medium).await;
     }
 
     pub fn adjust_internal(&mut self, frame: &Frame) {

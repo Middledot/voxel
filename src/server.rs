@@ -13,11 +13,11 @@ impl VoxelServer {
         // let listener = RakNetListener::new(
         //     config
         // ).await;
-        let me = Self {
+        
+        Self {
             version: "1.20.41".to_string(),
             protocol_version: "622".to_string(),
-        };
-        return me;
+        }
     }
 
     // pub async fn close(&mut self) {
@@ -25,7 +25,7 @@ impl VoxelServer {
     // }
 
     pub async fn run(&mut self, config: Config) {
-        let raknet_thread = thread::spawn(|| {
+        let _raknet_thread = thread::spawn(|| {
             tokio::runtime::Runtime::new().unwrap().block_on(async {
                 let mut listener = RakNetListener::new(config).await;
                 listener.mainloop().await;

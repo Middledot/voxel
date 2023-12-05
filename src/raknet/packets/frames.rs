@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use super::{FromBuffer, ToBuffer};
 use crate::raknet::objects::FragmentInfo;
 use crate::raknet::objects::MsgBuffer;
@@ -7,7 +9,7 @@ use crate::raknet::objects::msgbuffer::PacketPriority;
 use crate::raknet::objects::msgbuffer::SendPacket;
 use crate::raknet::objects::reliability::ReliabilityType;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Frame {
     pub flags: u8,
     pub bitlength: u16, // remove?
@@ -16,6 +18,7 @@ pub struct Frame {
     pub fragment_info: FragmentInfo,
     pub inner_packet_id: u8,
     pub body: MsgBuffer,
+    pub priority: Option<PacketPriority>,
 }
 
 impl Frame {
@@ -65,12 +68,31 @@ impl Frame {
             fragment_info: FragmentInfo { is_fragmented: false, compound_size: None, compound_id: None, index: None },
             inner_packet_id: packet_id,
             body,
+            priority: None,
         }
     }
 
     // pub fn from_old_frame(frame: &Frame) -> Self {
 
     // }
+}
+
+impl Ord for Frame {
+    fn cmp(&self, other: &Self) -> Ordering {
+        if let Some(prio) = self.priority {
+            if let Some(other_prio) = other.priority {
+                return prio.cmp(&other_prio);
+            }
+        }
+
+        Ordering::Equal
+    }
+}
+
+impl PartialOrd for Frame {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 impl FromBuffer for Frame {
@@ -110,6 +132,7 @@ impl FromBuffer for Frame {
             fragment_info,
             inner_packet_id,
             body,
+            priority: None,
         }
     }
 }
@@ -186,13 +209,15 @@ impl FrameSet {
         }
     }
 
-    // pub fn try_add_frame(&mut self, frame: Frame, mtu: u16) -> Option<FrameSet> {
-    //     if self.currentsize() + frame.totalsize() > mtu {
-    //         let mut new_frameset = FrameSet {index: self.index+1, frames: vec![frame]};
-    //         return Some(new_frameset)
-    //     }
+    pub fn try_add_frame(&mut self, frame: Frame, mtu: u16) -> Option<FrameSet> {
+        if self.currentsize() + frame.totalsize() > mtu {
+            let new_frameset = FrameSet {index: self.index+1, frames: vec![frame]};
+            return Some(new_frameset)
+        }
 
-    // }
+        self.add_frame(frame);
+        None
+    }
 }
 
 impl FromBuffer for FrameSet {

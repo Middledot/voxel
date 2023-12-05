@@ -8,7 +8,7 @@ use std::net::SocketAddr;
 
 use super::datatypes::*;
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub enum PacketPriority {
     Immediate = 8,
     High = 4,
@@ -43,7 +43,6 @@ impl PartialOrd for SendPacket {
         Some(self.cmp(other))
     }
 }
-
 
 
 #[derive(Debug, Clone, Eq, PartialEq)]

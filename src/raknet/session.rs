@@ -3,10 +3,12 @@ use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use std::collections::BinaryHeap;
 
+use log::warn;
 use tokio::sync::mpsc::Sender;
 
 use crate::raknet::objects::datatypes::to_i32_varint_bytes;
 
+use super::objects::{Reliability, FragmentInfo};
 use super::objects::datatypes::get_unix_milis;
 use super::objects::msgbuffer::Packet;
 use super::objects::{MsgBuffer, msgbuffer::{PacketPriority, SendPacket}};
@@ -27,9 +29,9 @@ pub struct Session {
     rel_server_index: u32,
     ord_channels: Vec<u32>,
     pub send_heap: BinaryHeap<SendPacket>,
+    frames_queue: Arc<Mutex<BinaryHeap<Frame>>>,
     pub recv_queue: Vec<Packet>,
     pub send_queue: Vec<Packet>,
-    frames_queue: Arc<Mutex<Vec<Frame>>>,
     resend_queue: Arc<Mutex<HashMap<u32, FrameSet>>>,
     missing_records: Arc<Mutex<Vec<u32>>>,
 }
@@ -48,12 +50,18 @@ impl Session {
             rel_server_index: 0,
             ord_channels: vec![],
             send_heap: BinaryHeap::new(),
+            frames_queue: Arc::new(Mutex::new(BinaryHeap::new())),
             recv_queue: vec![],
             send_queue: vec![],
-            frames_queue: Arc::new(Mutex::new(vec![])),
             resend_queue: Arc::new(Mutex::new(HashMap::new())),
             missing_records: Arc::new(Mutex::new(vec![])),
         }
+    }
+
+    fn next_fs_index(&mut self) -> u32 {
+        self.fs_server_index += 1;
+
+        self.fs_server_index - 1
     }
 
     pub async fn recv(&mut self, packet: Packet) {
@@ -76,74 +84,78 @@ impl Session {
         // }
         // return false;
 
+        if self.send_heap.is_empty() {
+            return;
+        }
+
         // package into frame sets
         let mut frameset = FrameSet {
-            index: self.fs_server_index,
+            index: self.next_fs_index(),
             frames: vec![],
         };
+        let mut current_prio = PacketPriority::Medium;
 
         let mut frames_queue = self.frames_queue.lock().unwrap();
-        frames_queue.sort_by_key(|x| {
-            match x.reliability.rel_frameindex {
-                Some(e) => e,
-                None => 4
-            }
-        });
+        let mut resend_queue = self.resend_queue.lock().unwrap();
+
+        // frames_queue.sort_by_key(|x| {
+        //     match x.reliability.rel_frameindex {
+        //         Some(e) => e,
+        //         None => 4
+        //     }
+        // });
+
+        // TODO: add a system where it keeps adding frames based on prio
+        // until a timer runs out and the next tick runs
+        // TODO: actually we need to somehow mix in different prio types,
+        // maybe need to switch data structures.
 
         for _ in 0..frames_queue.len() {
-            let frame = frames_queue.remove(0);
-            if frameset.currentsize() + frame.totalsize() > self.mtu as u16 {
-                self.send_queue.push(Packet {
-                    packet_id: 0x84,
-                    timestamp: get_unix_milis(),
-                    body: frameset.to_buffer(),
-                });
-                self.resend_queue
-                    .lock()
-                    .unwrap()
-                    .insert(frameset.index, frameset);
-                frameset = FrameSet {
-                    index: self.fs_server_index + 1,
-                    frames: vec![],
-                };
-            }
+            let frame = match frames_queue.pop() {
+                Some(pack) => pack,
+                None => return,
+            };
+            current_prio = frame.priority.clone().unwrap();
 
-            frameset.add_frame(frame);
-            if frameset.frames.len() == 1 {
-                self.fs_server_index += 1;
+            match frameset.try_add_frame(frame, self.mtu as u16) {
+                Some(new_frameset) => {
+                    self.send_heap.push(frameset.package(current_prio));
+                    resend_queue.insert(frameset.index, frameset);
+                    frameset = new_frameset;
+                    self.fs_server_index += 1;  // I already increment in try_add_frame, just need to match here
+                },
+                None => {}
             }
-            // println!("{}", self.fs_server_index);
         }
 
-        if frameset.frames.len() > 0 {
-            self.send_queue.push(Packet {
-                packet_id: 0x80,
-                timestamp: get_unix_milis(),
-                body: frameset.to_buffer(),
-            })
-        }
+        self.send_heap.push(frameset.package(current_prio));
+        resend_queue.insert(frameset.index, frameset);
     }
 
     fn send(&mut self, packet: SendPacket) {
         self.send_heap.push(packet);
     }
 
-    
-    fn send_frame(&mut self, frame: Frame, priority: PacketPriority) {
+    async fn send_frame(&mut self, mut frame: Frame, priority: PacketPriority) {
         // immediate frames sent in new frames sets immediately
         // others are just added to the frames queue + other function to package them
+
+        // example packet that works (from wireshark)
         // 0000   02 00 00 00 45 00 00 38 7a 44 00 00 80 11 00 00   ....E..8zD......
         // 0010   7f 00 00 01 7f 00 00 01 4a be ee 2c 00 24 e6 a3   ........J..,.$..
         // 0020   80 04 00 00 64 00 70 01 00 00 00 00 00 00 fe 0c   ....d.p.........
         // 0030   8f 01 01 00 00 00 00 00 00 00 00 00               ............
-        // if priority == PacketPriority::Immediate {
-        //     let indiv_frameset
-        //     self.tx.send(())
-        // }
-        self.frames_queue.lock().unwrap().push(frame)
+        if priority == PacketPriority::Immediate {
+            let mut frameset = FrameSet {index: self.next_fs_index(), frames: vec![]};
+            frameset.add_frame(frame);
+            self.tx.send((frameset.package(priority), self.sockaddr)).await.unwrap_or_else(|_| {warn!("Failed to send packet")});
+        } else {
+            frame.priority = Some(priority);
+            self.frames_queue.lock().unwrap().push(frame);
+        }
     }
 
-    fn send_default_frame(&mut self, packet_id: u8, body: MsgBuffer, priority: PacketPriority) {
+    async fn send_default_frame(&mut self, packet_id: u8, body: MsgBuffer, priority: PacketPriority) {
         self.rel_server_index += 1;
 
         match self.ord_channels.get(0) {
@@ -151,14 +163,17 @@ impl Session {
             None => self.ord_channels.insert(0, 0),
         }
 
+        // rust compiler my beloved
+        let fs_index = self.next_fs_index();
+
         self.send_frame(Frame::from_default_options(
-                0x10,
+                packet_id,
                 body,
-                self.rel_server_index,
+                fs_index,
                 self.ord_channels[0]
             ),
             priority
-        );
+        ).await;
     }
 
     pub async fn recv_ack(&mut self, mut packet: Packet) {
@@ -219,7 +234,18 @@ impl Session {
         pong.write_i64_be_bytes(packet.body.read_i64_be_bytes());
         pong.write_i64_be_bytes(get_unix_milis() as i64);
 
-        self.send_default_frame(0x03, pong, PacketPriority::Immediate);
+        let frame = Frame {
+            flags: 0,
+            bitlength: (pong.len() * 8) as u16,
+            bodysize: pong.len() as u16,
+            reliability: Reliability::extract(0, &mut MsgBuffer::new()),
+            fragment_info: FragmentInfo { is_fragmented: false, compound_size: None, compound_id: None, index: None },
+            inner_packet_id: 0x00,
+            body: pong,
+            priority: Some(PacketPriority::Immediate),
+        };
+
+        self.send_frame(frame, PacketPriority::Immediate).await;
     }
 
     pub async fn recv_frame_set(&mut self, mut packet: Packet) {
@@ -233,9 +259,8 @@ impl Session {
         }
 
         self.fs_client_index = frameset.index;
-        let mut frames_to_send: Vec<Frame> = vec![];
 
-        for mut frame in frameset.frames {
+        for frame in frameset.frames {
             self.adjust_internal(&frame);
             let packet = Packet {
                 packet_id: frame.inner_packet_id,
@@ -243,65 +268,15 @@ impl Session {
                 body: frame.body,
             };
 
-            // handle no-reply packets
             match frame.inner_packet_id {
-                0x00 => {self.recv_ping(packet).await; continue;}
-                0x13 => {self.recv_frame_new_incoming_connection(packet).await; continue;},
-                0x09 => {self.recv_frame_connection_request(packet).await; continue;},
-                // 0x15 => return,  // TODO:
-                _ => {},
-            };
-
-            let (packet_id, mut reply) = match frame.inner_packet_id {
-                0xfe => (0xfe, self.recv_game_packet(packet).await),
-                0x15 => return,
+                0x00 => self.recv_ping(packet).await,
+                0x13 => self.recv_frame_new_incoming_connection(packet).await,
+                0x09 => self.recv_frame_connection_request(packet).await,
+                0xfe => self.recv_game_packet(packet).await,
+                0x15 => return,  // TODO:
                 _ => panic!("uh oh <:O {}", frame.inner_packet_id)
             };
-
-            if packet_id == 0xfe {
-                // frame.reliability = Reliability {
-                //     reltype: ReliabilityType::from_flags(64),
-                //     rel_frameindex: Some(2),
-                //     seq_frameindex: None,
-                //     ord_frameindex: None,
-                //     ord_channel: None,
-                // };
-                frame.reliability.ord_frameindex = Some(frame.reliability.ord_frameindex.unwrap() - 1);
-                let fr = Frame {
-                    flags: frame.flags,
-                    bitlength: (reply.len() * 8) as u16,
-                    bodysize: reply.len() as u16,
-                    reliability: frame.reliability,
-                    fragment_info: frame.fragment_info,
-                    inner_packet_id: packet_id,
-                    body: reply,
-                };
-                frames_to_send.push(fr);
-                // let fr2 = Frame {
-                //     flags: frame.flags,
-                //     bitlength: (reply.len() * 8) as u16,
-                //     bodysize: reply.len() as u16,
-                //     reliability: frame.reliability,
-                //     fragment_info: frame.fragment_info,
-                //     inner_packet_id: packet_id,
-                //     body: reply,
-                // };
-                // frames_to_send.push(fr2);
-                continue;
-            }
-
-            frames_to_send.push(Frame {
-                flags: frame.flags,
-                bitlength: (reply.len() * 8) as u16,
-                bodysize: reply.len() as u16,
-                reliability: frame.reliability,
-                fragment_info: frame.fragment_info,
-                inner_packet_id: packet_id,
-                body: reply,
-            });
         }
-
-        self.frames_queue.lock().unwrap().append(&mut frames_to_send);
     }
 
     pub async fn recv_frame_connection_request(&mut self, mut packet: Packet) {
@@ -315,13 +290,13 @@ impl Session {
         self.send_default_frame(0x10, OnlineConnAccepted {client_address: self.sockaddr, timestamp: request.timestamp}.to_buffer(), PacketPriority::Medium);
     }
 
-    pub async fn recv_frame_new_incoming_connection(&mut self, mut packet: Packet) {
+    pub async fn recv_frame_new_incoming_connection(&mut self, packet: Packet) {
         // Technically don't even have to parse this
         // let _request = NewIncomingConnection::from_buffer(&mut packet.body);
         // println!("hier {:?}", request.internal_address);
     }
 
-    pub async fn recv_game_packet(&mut self, mut packet: Packet) -> MsgBuffer {
+    pub async fn recv_game_packet(&mut self, mut packet: Packet) {
         // istg the api is nested as heck
         // frameset{
         //    frame{
@@ -380,7 +355,7 @@ impl Session {
             response.append(&mut resp);
         }
 
-        MsgBuffer::from(response)
+        self.send_default_frame(0xfe, MsgBuffer::from(response), PacketPriority::Medium);
     }
 
     pub fn adjust_internal(&mut self, frame: &Frame) {

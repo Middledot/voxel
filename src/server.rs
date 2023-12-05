@@ -34,7 +34,7 @@ impl VoxelServer {
 
         loop {}
 
-        let _ = raknet_thread.join();
+        // let _ = raknet_thread.join();
         // self.close().await;
     }
 }

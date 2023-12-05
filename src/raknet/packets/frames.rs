@@ -1,13 +1,13 @@
 use std::cmp::Ordering;
 
 use super::{FromBuffer, ToBuffer};
-use crate::raknet::objects::FragmentInfo;
-use crate::raknet::objects::MsgBuffer;
-use crate::raknet::objects::Reliability;
 use crate::raknet::objects::datatypes::get_unix_milis;
 use crate::raknet::objects::msgbuffer::PacketPriority;
 use crate::raknet::objects::msgbuffer::SendPacket;
 use crate::raknet::objects::reliability::ReliabilityType;
+use crate::raknet::objects::FragmentInfo;
+use crate::raknet::objects::MsgBuffer;
+use crate::raknet::objects::Reliability;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Frame {
@@ -53,7 +53,12 @@ impl Frame {
         size
     }
 
-    pub fn from_default_options(packet_id: u8, mut body: MsgBuffer, rel_frameindex: u32, ord_frameindex: u32) -> Self {
+    pub fn from_default_options(
+        packet_id: u8,
+        mut body: MsgBuffer,
+        rel_frameindex: u32,
+        ord_frameindex: u32,
+    ) -> Self {
         Self {
             flags: 96,
             bitlength: (body.len() * 8) as u16,
@@ -63,9 +68,14 @@ impl Frame {
                 rel_frameindex: Some(rel_frameindex),
                 seq_frameindex: None,
                 ord_frameindex: Some(ord_frameindex),
-                ord_channel: Some(0)
+                ord_channel: Some(0),
             },
-            fragment_info: FragmentInfo { is_fragmented: false, compound_size: None, compound_id: None, index: None },
+            fragment_info: FragmentInfo {
+                is_fragmented: false,
+                compound_size: None,
+                compound_id: None,
+                index: None,
+            },
             inner_packet_id: packet_id,
             body,
             priority: None,
@@ -167,10 +177,9 @@ impl ToBuffer for Frame {
         buf.write_byte(self.inner_packet_id);
         buf.write_buffer(self.body.get_bytes());
 
-        buf  // 3794229544342144685
+        buf // 3794229544342144685
     }
 }
-
 
 // #[derive(Debug)]
 // enum FrameSetFlags {
@@ -183,7 +192,6 @@ FLAG_PACKET_PAIR = 0b00010000;
 FLAG_CONTINUOUS_SEND = 0b00001000;
 FLAG_NEEDS_B_AND_AS = 0b00000100;
 */
-
 
 #[derive(Debug)]
 pub struct FrameSet {
@@ -205,14 +213,17 @@ impl FrameSet {
         SendPacket {
             packet_id: 0x80,
             body: self.to_buffer(),
-            priority
+            priority,
         }
     }
 
     pub fn try_add_frame(&mut self, frame: Frame, mtu: u16) -> Option<FrameSet> {
         if self.currentsize() + frame.totalsize() > mtu {
-            let new_frameset = FrameSet {index: self.index+1, frames: vec![frame]};
-            return Some(new_frameset)
+            let new_frameset = FrameSet {
+                index: self.index + 1,
+                frames: vec![frame],
+            };
+            return Some(new_frameset);
         }
 
         self.add_frame(frame);
@@ -221,7 +232,7 @@ impl FrameSet {
 }
 
 impl FromBuffer for FrameSet {
-    fn from_buffer(/*flags: u8, */buf: &mut MsgBuffer) -> Self {
+    fn from_buffer(/*flags: u8, */ buf: &mut MsgBuffer) -> Self {
         let index = buf.read_u24_le_bytes();
         let mut frames: Vec<Frame> = vec![];
 
@@ -229,7 +240,10 @@ impl FromBuffer for FrameSet {
             frames.push(Frame::from_buffer(buf))
         }
 
-        Self { /*flags,*/ index, frames }
+        Self {
+            /*flags,*/ index,
+            frames,
+        }
     }
 }
 

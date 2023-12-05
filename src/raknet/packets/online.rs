@@ -69,7 +69,7 @@ impl FromBuffer for NewIncomingConnection {
         Self {
             server_address,
             request_timestamp,
-            accept_timestamp
+            accept_timestamp,
         }
     }
 }

@@ -1,5 +1,5 @@
-use super::raknet::server::RakNetListener;
 use super::config::Config;
+use super::raknet::server::RakNetListener;
 use std::thread;
 
 pub struct VoxelServer {
@@ -8,7 +8,6 @@ pub struct VoxelServer {
     protocol_version: String,
 }
 
-
 impl VoxelServer {
     pub async fn init() -> Self {
         // let listener = RakNetListener::new(
@@ -16,9 +15,9 @@ impl VoxelServer {
         // ).await;
         let me = Self {
             version: "1.20.41".to_string(),
-            protocol_version: "622".to_string()
+            protocol_version: "622".to_string(),
         };
-        return me
+        return me;
     }
 
     // pub async fn close(&mut self) {

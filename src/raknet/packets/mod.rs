@@ -6,8 +6,9 @@ pub mod online;
 
 pub use acknack::{Ack, Nack};
 pub use frames::{Frame, FrameSet};
-pub use obj::{FromBuffer, ToBuffer, PacketID};
+pub use obj::{FromBuffer, PacketID, ToBuffer};
 pub use offline::{
-    OfflineConnRep1, OfflineConnRep2, OfflineConnReq1, OfflineConnReq2, OfflinePing, OfflinePong, IncompatibleProtocol,
+    IncompatibleProtocol, OfflineConnRep1, OfflineConnRep2, OfflineConnReq1, OfflineConnReq2,
+    OfflinePing, OfflinePong,
 };
-pub use online::{OnlineConnAccepted, OnlineConnReq, NewIncomingConnection};
+pub use online::{NewIncomingConnection, OnlineConnAccepted, OnlineConnReq};

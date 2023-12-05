@@ -44,7 +44,6 @@ impl PartialOrd for SendPacket {
     }
 }
 
-
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct MsgBuffer {
     buffer: Vec<u8>,
@@ -238,7 +237,7 @@ impl MsgBuffer {
         // https://lemire.me/blog/2022/11/25/making-all-your-integers-positive-with-zigzag-encoding/
         let val = self.read_i32_be_bytes();
         if val < 0 {
-            return -2 * val - 1
+            return -2 * val - 1;
         }
         2 * val
     }

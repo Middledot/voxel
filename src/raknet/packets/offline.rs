@@ -134,7 +134,7 @@ impl ToBuffer for IncompatibleProtocol {
     fn to_buffer(&self) -> MsgBuffer {
         let mut buf = MsgBuffer::new();
 
-        buf.write_byte(11);  // mojang protocol
+        buf.write_byte(11); // mojang protocol
         buf.write_magic(&self.magic);
         buf.write_i64_be_bytes(self.server_guid);
 

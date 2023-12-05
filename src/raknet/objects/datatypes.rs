@@ -11,7 +11,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::MsgBuffer;
 
-
 // long (64)
 pub fn from_i64_be_bytes(bytes: [u8; 8]) -> i64 {
     i64::from_be_bytes(bytes)
@@ -28,7 +27,6 @@ pub fn from_u64_be_bytes(bytes: [u8; 8]) -> u64 {
 pub fn to_u64_be_bytes(value: u64) -> [u8; 8] {
     value.to_be_bytes()
 }
-
 
 // int (32)
 pub fn from_i32_be_bytes(bytes: [u8; 4]) -> i32 {
@@ -47,7 +45,6 @@ pub fn to_u32_be_bytes(value: u32) -> [u8; 4] {
     value.to_be_bytes()
 }
 
-
 pub fn from_i32_le_bytes(bytes: [u8; 4]) -> i32 {
     i32::from_le_bytes(bytes)
 }
@@ -56,7 +53,6 @@ pub fn to_i32_le_bytes(value: i32) -> [u8; 4] {
     value.to_le_bytes()
 }
 
-
 pub fn from_f32_le_bytes(bytes: [u8; 4]) -> f32 {
     f32::from_le_bytes(bytes)
 }
@@ -64,7 +60,6 @@ pub fn from_f32_le_bytes(bytes: [u8; 4]) -> f32 {
 pub fn to_f32_le_bytes(value: f32) -> [u8; 4] {
     value.to_le_bytes()
 }
-
 
 pub fn from_i32_varint_bytes(buf: &mut MsgBuffer) -> i32 {
     // taken from JSPrismarine
@@ -94,18 +89,15 @@ pub fn to_i32_varint_bytes(value: i32) -> Vec<u8> {
 
     let mut vec = vec![];
     while value != 0 {
-        let mut temp: u8 = (value & 0b01111111_u32) as u8;  // cast here won't fail (probably)
+        let mut temp: u8 = (value & 0b01111111_u32) as u8; // cast here won't fail (probably)
         value = value >> 7;
         if value != 0 {
             temp |= 0b10000000;
         }
         vec.push(temp);
-    };
+    }
     vec
 }
-
-
-
 
 // triad (24)
 pub fn from_u24_le_bytes_to_u32(bytes: [u8; 3]) -> u32 {
@@ -123,7 +115,6 @@ pub fn to_u24_le_bytes(value: u32) -> [u8; 3] {
     newarr
 }
 
-
 pub fn from_i16_be_bytes(bytes: [u8; 2]) -> i16 {
     i16::from_be_bytes(bytes)
 }
@@ -131,7 +122,6 @@ pub fn from_i16_be_bytes(bytes: [u8; 2]) -> i16 {
 pub fn to_i16_be_bytes(value: i16) -> [u8; 2] {
     value.to_be_bytes()
 }
-
 
 pub fn from_u16_be_bytes(bytes: [u8; 2]) -> u16 {
     u16::from_be_bytes(bytes)
@@ -141,7 +131,6 @@ pub fn to_u16_be_bytes(value: u16) -> [u8; 2] {
     value.to_be_bytes()
 }
 
-
 pub fn from_u16_le_bytes(bytes: [u8; 2]) -> u16 {
     u16::from_le_bytes(bytes)
 }
@@ -149,7 +138,6 @@ pub fn from_u16_le_bytes(bytes: [u8; 2]) -> u16 {
 pub fn to_u16_le_bytes(value: u16) -> [u8; 2] {
     value.to_le_bytes()
 }
-
 
 // TODO: test this (especially ipv6)
 #[allow(clippy::ptr_arg)]
@@ -215,11 +203,9 @@ pub fn to_address_bytes(addr: &SocketAddr) -> Vec<u8> {
     address
 }
 
-
 // double (float 64)
 // float (float 32)
 // TODO: implement these when you figure out if they're big endian or not
-
 
 pub fn get_unix_milis() -> u128 {
     let start = SystemTime::now();

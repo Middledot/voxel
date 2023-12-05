@@ -72,7 +72,6 @@ impl ReliabilityType {
     }
 }
 
-
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Reliability {
     pub reltype: ReliabilityType,

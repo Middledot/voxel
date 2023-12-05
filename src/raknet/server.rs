@@ -4,18 +4,17 @@
 /// The server, one who handles RakNet packets.
 ///
 /// Reference: https://wiki.vg/Raknet_Protocol
-
 use rand::Rng;
-use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::task::JoinHandle;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::task::JoinHandle;
 
-use log::{trace, info};
+use log::{info, trace};
 
 use super::objects::datatypes::get_unix_milis;
-use super::objects::msgbuffer::{Packet, SendPacket, PacketPriority};
+use super::objects::msgbuffer::{Packet, PacketPriority, SendPacket};
 use super::objects::MsgBuffer;
 use super::packets::*;
 use super::session::Session;
@@ -35,7 +34,9 @@ pub struct RakNetListener {
 impl RakNetListener {
     pub async fn new(config: Config) -> Self {
         let (tx, mut sockrx) = tokio::sync::mpsc::channel(32);
-        let socket = Arc::new(Socket::bind("127.0.0.1:".to_string() + config.get_property("server-port")).await);
+        let socket = Arc::new(
+            Socket::bind("127.0.0.1:".to_string() + config.get_property("server-port")).await,
+        );
 
         let sock_to_manage = socket.clone();
 
@@ -80,7 +81,7 @@ impl RakNetListener {
             "Creative",
             "1",
             self.config.get_property("server-port").as_str(),
-            self.config.get_property("server-portv6").as_str()
+            self.config.get_property("server-portv6").as_str(),
         ]
         .join(";")
     }
@@ -116,14 +117,15 @@ impl RakNetListener {
                     .await;
                 return None;
             }
-            0x05 => {  // ((ip.src == 192.168.66.151 && ip.dst == 192.168.66.0/8) || (ip.src == 192.168.66.0/8 && ip.dst == 192.168.66.151))
+            0x05 => {
+                // ((ip.src == 192.168.66.151 && ip.dst == 192.168.66.0/8) || (ip.src == 192.168.66.0/8 && ip.dst == 192.168.66.151))
                 // trace!("0x{packet_id} RECV = {:?}", body.get_bytes());
                 let request1 = OfflineConnReq1::from_buffer(&mut body);
 
                 if request1.protocol != 11 {
                     let wrong_proto = IncompatibleProtocol {
                         magic: request1.magic,
-                        server_guid: self.server_guid
+                        server_guid: self.server_guid,
                     };
 
                     self.socket
@@ -186,7 +188,8 @@ impl RakNetListener {
         loop {
             let last_update_time = get_unix_milis();
 
-            while get_unix_milis() - last_update_time < 100 {  // RakNet ticks are a tenth of a second
+            while get_unix_milis() - last_update_time < 100 {
+                // RakNet ticks are a tenth of a second
                 let (packet, client) = match self.read_message().await {
                     Some((packet, client)) => (packet, client),
                     None => continue,
@@ -200,7 +203,8 @@ impl RakNetListener {
             // also find out if raknet ticks or if that's just a minecraft thing
             // cuz idk
             for (_, sess) in self.sessions.iter_mut() {
-                /*let immediates = */ sess.tick().await;
+                /*let immediates = */
+                sess.tick().await;
                 // if immediates {
                 //     while sess.send_heap.peek().unwrap().priority == PacketPriority::Immediate {
                 //         self.socket.send_spacket(sess.send_heap.pop().unwrap(), sess.sockaddr).await;

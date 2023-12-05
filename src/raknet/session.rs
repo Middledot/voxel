@@ -25,7 +25,10 @@ pub struct Session {
     pub guid: i64,
     pub server_guid: i64,
     pub mtu: i16,
-    fs_server_index: u32,  // imma use abbr here cuz 
+
+    // tick: u64,
+    // tick_interval: u64,
+    fs_server_index: u32, // fs = frameset
     fs_client_index: u32,
     rel_client_index: u32,
     rel_server_index: u32,

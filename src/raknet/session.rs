@@ -6,11 +6,10 @@ use std::sync::{Arc, Mutex};
 use log::warn;
 use tokio::sync::mpsc::Sender;
 
-use crate::raknet::objects::datatypes::to_i32_varint_bytes;
-
-use super::objects::datatypes::get_unix_milis;
 use super::objects::msgbuffer::Packet;
 use super::objects::{
+    to_i32_varint_bytes,
+    get_unix_milis,
     msgbuffer::{PacketPriority, SendPacket},
     MsgBuffer,
 };
